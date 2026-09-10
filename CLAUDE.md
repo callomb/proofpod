@@ -21,6 +21,23 @@ and SETUP.md.
 - Company default test values → copied onto each test at creation → the test's
   gear icon edits that test only.
 
+## Admin portal & certificates
+
+- Two roles: `admin` and site user (`member`). `getWorkspace()` returns
+  `isAdmin`; `requireAdmin()` redirects site users to `/home`. Deactivated
+  members (`company_members.status='inactive'`) redirect to `/deactivated`.
+- Test-setting hierarchy: company `test_profiles` default → `projects` override
+  columns (`override_test_profile` + 6 values) → per-test snapshot at creation.
+  `create_test` resolves this.
+- Certificates are immutable: `issue_certificate(project_id, test_ids[])` freezes
+  a jsonb `snapshot` in-transaction and assigns `PPC-000001` from a sequence.
+  `certificate-actions.ts` then renders the PDF (`certificate-pdf.tsx`, Node
+  runtime, `@react-pdf/renderer`) and stores it in the private `certificates`
+  bucket. Re-download serves the stored file; regenerates from snapshot only if
+  missing. Never regenerate a certificate from current project data.
+- Only `passed` tests are certifiable. Empty stage sections and signature boxes
+  must never appear on the PDF.
+
 ## Architecture notes
 
 - Next.js 16: `proxy.ts` (not `middleware.ts`), async `params`/`searchParams`/

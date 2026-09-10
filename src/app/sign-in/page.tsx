@@ -3,7 +3,8 @@ import { Wordmark } from "@/components/wordmark";
 
 export default async function SignInPage(props: PageProps<"/sign-in">) {
   const { next } = await props.searchParams;
-  const target = typeof next === "string" && next.startsWith("/") ? next : "/home";
+  // Empty => signInAction routes by role (admins land on the admin portal).
+  const target = typeof next === "string" && next.startsWith("/") ? next : "";
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[400px] flex-col justify-center px-6 py-16">

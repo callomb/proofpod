@@ -24,7 +24,7 @@ export function SignInForm({ next }: { next: string }) {
   const [state, action] = useActionState<ActionResult, FormData>(signInAction, {});
   return (
     <form action={action} className="space-y-4">
-      <input type="hidden" name="next" value={next} />
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field label="Email">
         <input
           name="email"
