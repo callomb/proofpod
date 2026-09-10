@@ -102,7 +102,8 @@ const s = StyleSheet.create({
   brandSub: { fontSize: 8, color: muted, marginTop: 2 },
   companyName: { fontSize: 10, fontFamily: "Helvetica-Bold", textAlign: "right" },
   companyLine: { fontSize: 8, color: muted, textAlign: "right" },
-  h1: { fontSize: 18, fontFamily: "Helvetica-Bold", marginBottom: 2 },
+  h1: { fontSize: 18, fontFamily: "Helvetica-Bold", marginBottom: 8 },
+  intro: { fontSize: 8.5, color: muted, marginBottom: 6, maxWidth: 380 },
   h2: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
@@ -110,7 +111,7 @@ const s = StyleSheet.create({
     letterSpacing: 1,
     color: muted,
     marginBottom: 8,
-    marginTop: 20,
+    marginTop: 22,
   },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   cell: { width: "50%", marginBottom: 8, paddingRight: 12 },
@@ -349,7 +350,7 @@ function CertificateDoc({
         <CompanyHeader snapshot={snapshot} logo={logo} />
 
         <Text style={s.h1}>Pressure Test Certificate</Text>
-        <Text style={{ color: muted, marginBottom: 4 }}>
+        <Text style={s.intro}>
           This certificate records completed and passed pressure tests. It is a
           historical document — the details below are fixed as at the issue date.
         </Text>
@@ -395,7 +396,7 @@ function CertificateDoc({
         <Page key={t.id} size="A4" style={s.page}>
           <CompanyHeader snapshot={snapshot} logo={logo} />
           <Text style={s.h1}>Test evidence</Text>
-          <Text style={{ color: muted, marginBottom: 6 }}>
+          <Text style={s.intro}>
             {p.name} · Certificate {number}
           </Text>
           <TestEvidence test={t} images={images} />
