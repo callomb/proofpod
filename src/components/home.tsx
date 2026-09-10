@@ -6,14 +6,16 @@ import Link from "next/link";
 
 import { createProjectAction, type ActionResult } from "@/lib/actions";
 import { timeOfDay } from "@/lib/domain";
+import { useMounted } from "@/lib/use-mounted";
 import type { ProjectOverview } from "@/lib/types";
 import { Sheet } from "./app-shell";
 import { Button, Card, Field, FormError, StatusDot, inputClass } from "./ui";
 
 export function GreetingLine({ firstName }: { firstName: string }) {
-  const [greeting] = useState(() => `Good ${timeOfDay(new Date())}`);
+  const mounted = useMounted();
+  const greeting = mounted ? `Good ${timeOfDay(new Date())}` : "Hello";
   return (
-    <h1 className="text-[26px] font-semibold tracking-tight">
+    <h1 className="text-[26px] font-semibold tracking-tight" suppressHydrationWarning>
       {greeting}, {firstName}
     </h1>
   );

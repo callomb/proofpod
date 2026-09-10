@@ -71,16 +71,18 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
 
   const { data: members } = await supabase
     .from("company_members")
-    .select("user_id, profiles(full_name)")
+    .select("user_id")
     .eq("company_id", company.id);
 
+  const userIds = (members ?? []).map((m) => (m as { user_id: string }).user_id);
+  const { data: memberProfiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+
   const memberNames: Record<string, string> = {};
-  for (const m of (members ?? []) as unknown as {
-    user_id: string;
-    profiles: { full_name: string } | { full_name: string }[] | null;
-  }[]) {
-    const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-    memberNames[m.user_id] = prof?.full_name || "Someone";
+  for (const p of (memberProfiles ?? []) as { id: string; full_name: string }[]) {
+    memberNames[p.id] = p.full_name || "Someone";
   }
 
   return { user, profile, company, membership, memberNames };

@@ -4,6 +4,8 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+import { useMounted } from "@/lib/use-mounted";
+
 import {
   completeStageAction,
   createRetestAction,
@@ -52,11 +54,13 @@ interface Props {
   retests: { id: string; ref: string; status: PressureTest["status"] }[];
 }
 
+// Times are rendered in the viewer's local timezone, so they must only appear
+// after mount — otherwise SSR (server timezone/locale) mismatches hydration.
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString([], {
+  return new Date(iso).toLocaleString("en-GB", {
     day: "numeric",
     month: "short",
     hour: "2-digit",
@@ -97,6 +101,7 @@ function StageCard({
   locked: boolean;
 }) {
   const router = useRouter();
+  const mounted = useMounted();
   const [busy, setBusy] = useState<null | "start" | "complete">(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -169,7 +174,7 @@ function StageCard({
 
   const stagePhotos = photos.filter((p) => p.stage === stage.stage);
   const minComplete =
-    stage.started_at && targets.duration
+    mounted && stage.started_at && targets.duration
       ? fmtTime(
           new Date(new Date(stage.started_at).getTime() + targets.duration * 60000).toISOString(),
         )
@@ -207,8 +212,8 @@ function StageCard({
 
       {stage.status === "in_progress" ? (
         <>
-          <p className="mt-2 text-[12px] text-muted">
-            Started {fmtTime(stage.started_at!)}
+          <p className="mt-2 text-[12px] text-muted" suppressHydrationWarning>
+            {mounted ? `Started ${fmtTime(stage.started_at!)}` : "Started —"}
             {minComplete ? ` · Minimum complete ${minComplete}` : ""}
             {stage.started_by ? ` · ${memberNames[stage.started_by] ?? "Someone"}` : ""}
           </p>
@@ -226,9 +231,10 @@ function StageCard({
       ) : null}
 
       {stage.status === "complete" ? (
-        <p className="mt-2 text-[12px] text-muted">
-          Started {fmtTime(stage.started_at!)} · Ended {fmtTime(stage.completed_at!)} · Actual{" "}
-          {elapsedLabel(stage.started_at!, stage.completed_at!)}
+        <p className="mt-2 text-[12px] text-muted" suppressHydrationWarning>
+          {mounted
+            ? `Started ${fmtTime(stage.started_at!)} · Ended ${fmtTime(stage.completed_at!)} · Actual ${elapsedLabel(stage.started_at!, stage.completed_at!)}`
+            : `Actual ${elapsedLabel(stage.started_at!, stage.completed_at!)}`}
         </p>
       ) : null}
 
@@ -615,6 +621,9 @@ function ProvenanceBlock({
   photos: PhotoView[];
   memberNames: Record<string, string>;
 }) {
+  const mounted = useMounted();
+  const when = (iso: string) => (mounted ? ` · ${fmtDateTime(iso)}` : "");
+
   const firstStart = stages
     .filter((s) => s.started_at)
     .sort((a, b) => a.started_at!.localeCompare(b.started_at!))[0];
@@ -626,19 +635,17 @@ function ProvenanceBlock({
   if (firstStart?.started_by)
     rows.push([
       "Started by",
-      `${memberNames[firstStart.started_by] ?? "Someone"} · ${fmtDateTime(firstStart.started_at!)}`,
+      `${memberNames[firstStart.started_by] ?? "Someone"}${when(firstStart.started_at!)}`,
     ]);
   if (lastComplete?.completed_by)
     rows.push([
       "Completed by",
-      `${memberNames[lastComplete.completed_by] ?? "Someone"} · ${fmtDateTime(
-        lastComplete.completed_at!,
-      )}`,
+      `${memberNames[lastComplete.completed_by] ?? "Someone"}${when(lastComplete.completed_at!)}`,
     ]);
   if (test.result_at && test.result_by)
     rows.push([
       test.status === "passed" ? "Passed by" : test.status === "failed" ? "Failed by" : "Result by",
-      `${memberNames[test.result_by] ?? "Someone"} · ${fmtDateTime(test.result_at)}`,
+      `${memberNames[test.result_by] ?? "Someone"}${when(test.result_at)}`,
     ]);
   rows.push(["Evidence photos", String(photos.length)]);
   rows.push(["ProofPod ID", test.ref]);
@@ -650,7 +657,9 @@ function ProvenanceBlock({
       {rows.map(([k, v]) => (
         <div key={k} className="flex justify-between gap-4 text-[12px]">
           <dt className="text-faint">{k}</dt>
-          <dd className="text-right text-muted">{v}</dd>
+          <dd className="text-right text-muted" suppressHydrationWarning>
+            {v}
+          </dd>
         </div>
       ))}
     </dl>
