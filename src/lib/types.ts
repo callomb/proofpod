@@ -7,6 +7,15 @@ export type StageStatus = "not_started" | "in_progress" | "complete";
 export type SystemKind = "cold" | "hot" | "boosted" | "heating" | "other";
 export type PhotoKind = "start" | "end" | "other";
 export type MemberRole = "owner" | "admin" | "member";
+export type MemberStatus = "active" | "inactive";
+
+/** V1 has two effective roles. */
+export function isAdminRole(role: MemberRole): boolean {
+  return role === "admin" || role === "owner";
+}
+export function roleLabel(role: MemberRole): string {
+  return isAdminRole(role) ? "Admin" : "Site user";
+}
 
 export interface Profile {
   id: string;
@@ -36,6 +45,7 @@ export interface CompanyMember {
   company_id: string;
   user_id: string;
   role: MemberRole;
+  status: MemberStatus;
   created_at: string;
 }
 
@@ -77,6 +87,13 @@ export interface Project {
   site_address: string | null;
   status: ProjectStatus;
   test_profile_id: string | null;
+  override_test_profile: boolean;
+  initial_pressure_bar: number | null;
+  initial_duration_min: number | null;
+  strength_pressure_bar: number | null;
+  strength_duration_min: number | null;
+  pressure_pressure_bar: number | null;
+  pressure_duration_min: number | null;
   created_at: string;
   created_by: string | null;
   updated_at: string;
@@ -159,5 +176,72 @@ export interface AuditEvent {
   test_id: string | null;
   event_type: string;
   data: Record<string, unknown>;
+  created_at: string;
+}
+
+// --- Certificates ----------------------------------------------------------
+
+export interface CertSnapshotStage {
+  stage: StageKey;
+  target_pressure_bar: number | null;
+  target_duration_min: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  started_by: string | null;
+  completed_by: string | null;
+}
+
+export interface CertSnapshotPhoto {
+  kind: PhotoKind;
+  stage: StageKey | null;
+  storage_path: string;
+  taken_at: string;
+}
+
+export interface CertSnapshotTest {
+  id: string;
+  ref: string;
+  floor: string;
+  system: SystemKind;
+  system_other: string | null;
+  area: string;
+  status: TestStatus;
+  result_at: string | null;
+  result_by: string;
+  created_by: string;
+  stages: CertSnapshotStage[];
+  photos: CertSnapshotPhoto[] | null;
+}
+
+export interface CertificateSnapshot {
+  company: {
+    name: string;
+    address_line1: string | null;
+    address_line2: string | null;
+    city: string | null;
+    postcode: string | null;
+    phone: string | null;
+    logo_path: string | null;
+  };
+  project: {
+    name: string;
+    project_number: string | null;
+    client_name: string | null;
+    site_address: string | null;
+  };
+  tests: CertSnapshotTest[];
+  issued_at: string;
+}
+
+export interface Certificate {
+  id: string;
+  company_id: string;
+  project_id: string;
+  number: string;
+  test_count: number;
+  snapshot: CertificateSnapshot;
+  pdf_path: string | null;
+  issued_by: string | null;
+  issued_at: string;
   created_at: string;
 }

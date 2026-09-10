@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CollapsibleSection } from "@/components/collapsible-section";
@@ -27,21 +26,13 @@ export default async function ProjectPage(props: PageProps<"/projects/[projectId
         <BackLink href="/home">Projects</BackLink>
       </div>
 
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[24px] font-semibold tracking-tight">{project.name}</h1>
-          {project.client_name || project.project_number ? (
-            <p className="mt-0.5 text-[13px] text-muted">
-              {[project.project_number, project.client_name].filter(Boolean).join(" · ")}
-            </p>
-          ) : null}
-        </div>
-        <Link
-          href={`/projects/${project.id}/edit`}
-          className="shrink-0 pt-1 text-[13px] font-medium text-muted hover:text-ink"
-        >
-          Edit
-        </Link>
+      <div className="mb-5">
+        <h1 className="text-[24px] font-semibold tracking-tight">{project.name}</h1>
+        {project.client_name || project.project_number ? (
+          <p className="mt-0.5 text-[13px] text-muted">
+            {[project.project_number, project.client_name].filter(Boolean).join(" · ")}
+          </p>
+        ) : null}
       </div>
 
       <LinkButton

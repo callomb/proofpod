@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 import type {
+  Certificate,
   Company,
   CompanyMember,
   Profile,
@@ -23,6 +24,7 @@ export interface Workspace {
   profile: Profile;
   company: Company;
   membership: CompanyMember;
+  isAdmin: boolean;
   /** All members of the company, with their profiles, keyed for name lookups. */
   memberNames: Record<string, string>;
 }
@@ -60,6 +62,7 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
     .maybeSingle<CompanyMember>();
 
   if (!profile || !membership) redirect("/onboarding");
+  if (membership.status === "inactive") redirect("/deactivated");
 
   const { data: company } = await supabase
     .from("companies")
@@ -85,7 +88,16 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
     memberNames[p.id] = p.full_name || "Someone";
   }
 
-  return { user, profile, company, membership, memberNames };
+  const isAdmin = membership.role === "admin" || membership.role === "owner";
+
+  return { user, profile, company, membership, isAdmin, memberNames };
+});
+
+/** Workspace, but redirect Site Users away from admin-only areas. */
+export const requireAdmin = cache(async (): Promise<Workspace> => {
+  const ws = await getWorkspace();
+  if (!ws.isAdmin) redirect("/home");
+  return ws;
 });
 
 export async function listActiveProjects(): Promise<ProjectOverview[]> {
@@ -200,4 +212,40 @@ export async function signEvidenceUrls(
     if (row.path && row.signedUrl) out[row.path] = row.signedUrl;
   }
   return out;
+}
+
+// --- Admin: certificates --------------------------------------------------
+
+export async function listProjectCertificates(
+  projectId: string,
+): Promise<Certificate[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("certificates")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("issued_at", { ascending: false });
+  return (data ?? []) as Certificate[];
+}
+
+export async function getCertificate(id: string): Promise<Certificate | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("certificates")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle<Certificate>();
+  return data;
+}
+
+/** A single signed URL for a certificate PDF. */
+export async function signCertificateUrl(
+  path: string,
+  expiresIn = 60 * 60,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.storage
+    .from("certificates")
+    .createSignedUrl(path, expiresIn, { download: true });
+  return data?.signedUrl ?? null;
 }

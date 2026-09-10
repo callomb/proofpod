@@ -3,17 +3,12 @@ import Link from "next/link";
 import { DemoDataButton, SignOutButton } from "@/components/more-menu";
 import { Card } from "@/components/ui";
 import { getWorkspace } from "@/lib/data";
+import { roleLabel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const LINKS = [
-  { href: "/more/company", label: "Company & default test values" },
-  { href: "/more/team", label: "Team" },
-  { href: "/more/archived", label: "Archived projects" },
-];
-
 export default async function MorePage() {
-  const { profile, company, membership } = await getWorkspace();
+  const { profile, company, membership, isAdmin } = await getWorkspace();
 
   return (
     <div>
@@ -23,7 +18,7 @@ export default async function MorePage() {
         <p className="text-[16px] font-semibold">{profile.full_name || "Your name"}</p>
         <p className="text-[13px] text-muted">{profile.email}</p>
         <p className="mt-2 text-[13px] text-muted">
-          {company.name} · {membership.role}
+          {company.name} · {roleLabel(membership.role)}
         </p>
         <Link
           href="/more/profile"
@@ -33,24 +28,19 @@ export default async function MorePage() {
         </Link>
       </Card>
 
-      <div className="overflow-hidden rounded-card border border-line bg-paper">
-        {LINKS.map((l, i) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={`flex items-center justify-between px-4 py-3.5 text-[15px] active:bg-canvas ${
-              i > 0 ? "border-t border-line" : ""
-            }`}
-          >
-            {l.label}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-faint" aria-hidden>
-              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
-        ))}
-      </div>
+      {isAdmin ? (
+        <Link
+          href="/admin/projects"
+          className="mb-6 flex items-center justify-between rounded-card border border-line bg-paper px-4 py-3.5 text-[15px] font-medium active:bg-canvas"
+        >
+          Open the admin portal
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-faint" aria-hidden>
+            <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+      ) : null}
 
-      <div className="mt-6 space-y-3">
+      <div className="space-y-3">
         <DemoDataButton />
         <SignOutButton />
       </div>
