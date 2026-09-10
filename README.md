@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ProofPod
 
-## Getting Started
+Ultra-simple evidence capture for construction. **Beta: plumbing pressure testing.**
 
-First, run the development server:
+Plumbers pressure test their work — the evidence is the weak point. ProofPod makes
+recording a test faster than not recording it. It captures *what happened*: who,
+when, how long, with photos. It does not police plumbing standards or judge
+methodology.
+
+## Stack
+
+- **Next.js 16** (App Router, Turbopack) + React 19 + TypeScript
+- **Tailwind CSS v4** — monochrome design system, mobile-first
+- **Supabase** — Postgres, Auth, Storage, Row Level Security
+- Deploy target: **Vercel**
+
+## Getting started
+
+See **[SETUP.md](SETUP.md)** — Supabase project, schema, env vars, run, deploy.
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in Supabase keys
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Shape of the data
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+company ──< company_members >── auth user (profile)
+company ──< projects ──< pressure_tests ──< test_stages
+                                        └──< test_photos
+company ──< test_profiles           (default stage pressures / durations)
+company ──< audit_events            (provenance trail)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **projects**: `active` / `archived`. Quick-create needs only a name.
+- **pressure_tests**: `in_progress` / `passed` / `failed` / `void`. Three
+  independent stages (`initial`, `strength`, `pressure`) — none are required, no
+  enforced order. Six pressure/duration values are snapshotted per test.
+- **passed ⇒ locked**: immutable. Changes go through **retest** (`retest_of`).
+- All writes that record state go through `SECURITY DEFINER` RPCs
+  (`start_stage`, `complete_stage`, `set_test_result`, `void_test`,
+  `create_retest`, …) so timestamps are DB-authoritative and every event is
+  written to `audit_events` in the same transaction.
+- **RLS**: every table is scoped to the caller's company via
+  `user_company_ids()`. One company can never see another's data.
 
-## Learn More
+## Key files
 
-To learn more about Next.js, take a look at the following resources:
+| Path | What |
+| --- | --- |
+| `supabase/migrations/` | Schema, RLS, RPCs, storage buckets/policies |
+| `src/lib/supabase/` | Browser / server / admin / proxy clients |
+| `src/lib/data.ts` | Server-side reads |
+| `src/lib/actions.ts` | Server actions (thin wrappers over RPCs) |
+| `src/lib/domain.ts` | Floors, systems, formatting, status meta |
+| `src/proxy.ts` | Session refresh + route gating (Next 16 `proxy` convention) |
+| `src/app/(app)/` | Authenticated app (home, projects, tests, more) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Not in the beta (deliberately)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Native apps, offline mode, granular permissions, billing, PDF certificate engine,
+witness signatures, project merging, analytics dashboards, compliance checks.
+The schema leaves room for certificates, selective certificates, and witnesses.

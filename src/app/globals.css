@@ -1,26 +1,80 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  ProofPod design system
+  --------------------------------------------------
+  Monochrome. Typography does the work. Colour only for status.
+  Green = passed · Amber = in progress · Red = failed
+*/
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Ink & paper */
+  --color-paper: #ffffff;
+  --color-canvas: #f6f6f5;
+  --color-ink: #111111;
+  --color-ink-soft: #3d3d3d;
+  --color-muted: #8a8a86;
+  --color-faint: #b6b6b2;
+  --color-line: #e7e7e4;
+  --color-line-strong: #d8d8d4;
+
+  /* Status */
+  --color-pass: #1f9d55;
+  --color-pass-soft: #e7f4ec;
+  --color-progress: #c47f17;
+  --color-progress-soft: #f8efe0;
+  --color-fail: #cf3b3b;
+  --color-fail-soft: #fbeaea;
+  --color-void: #8a8a86;
+
+  --radius-card: 16px;
+
+  --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.04);
+  --shadow-pop: 0 12px 40px rgba(17, 17, 17, 0.14);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* iOS safe-area padding hook */
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+/* Remove the tap highlight on mobile, keep focus visible for keyboards */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/* Inputs shouldn't zoom Safari on focus: keep >=16px */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
