@@ -1,19 +1,16 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { useRouter } from "next/navigation";
 
 import {
-  createInviteAction,
-  setProjectStatusAction,
   updateCompanyAction,
   updateProfileAction,
   updateTestProfileAction,
   type ActionResult,
 } from "@/lib/actions";
-import type { Company, ProjectOverview, TestProfile } from "@/lib/types";
-import { Button, Card, Field, FormError, inputClass } from "./ui";
+import type { Company, TestProfile } from "@/lib/types";
+import { Button, Field, FormError, inputClass } from "./ui";
 
 function SaveButton({ label = "Save" }: { label?: string }) {
   const { pending } = useFormStatus();
@@ -125,72 +122,3 @@ export function TestProfileForm({ profile }: { profile: TestProfile }) {
   );
 }
 
-export function InviteForm({ companyId }: { companyId: string }) {
-  const [state, action] = useActionState<ActionResult & { link?: string }, FormData>(
-    createInviteAction,
-    {},
-  );
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <form action={action} className="space-y-3">
-      <input type="hidden" name="company_id" value={companyId} />
-      <Field label="Invite a plumber" hint="Optional email — just for your records. Share the link however you like.">
-        <input name="email" type="email" className={inputClass} placeholder="dave@company.co.uk" />
-      </Field>
-      <Button type="submit" variant="secondary" className="w-full">
-        Create invite link
-      </Button>
-      <FormError>{state.error}</FormError>
-      {state.link ? (
-        <div className="rounded-xl bg-canvas p-3">
-          <p className="mb-1 text-[12px] font-medium text-ink-soft">Invite link</p>
-          <p className="break-all text-[12px] text-muted">{state.link}</p>
-          <button
-            type="button"
-            className="mt-2 text-[12px] font-semibold underline underline-offset-2"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(state.link!);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              } catch {
-                /* clipboard blocked */
-              }
-            }}
-          >
-            {copied ? "Copied" : "Copy link"}
-          </button>
-        </div>
-      ) : null}
-    </form>
-  );
-}
-
-export function ReactivateButton({ project }: { project: ProjectOverview }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  return (
-    <Card className="flex items-center justify-between p-4">
-      <div>
-        <p className="text-[15px] font-semibold">{project.name}</p>
-        <p className="text-[12px] text-muted">
-          {project.tests_total} test{project.tests_total === 1 ? "" : "s"}
-        </p>
-      </div>
-      <Button
-        variant="secondary"
-        size="sm"
-        disabled={pending}
-        onClick={() =>
-          start(async () => {
-            await setProjectStatusAction(project.id, "active");
-            router.refresh();
-          })
-        }
-      >
-        {pending ? "…" : "Reactivate"}
-      </Button>
-    </Card>
-  );
-}

@@ -52,9 +52,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && (pathname === "/sign-in" || pathname === "/sign-up" || pathname === "/")) {
+  if (user && (pathname === "/sign-in" || pathname === "/sign-up")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/home";
+    url.pathname = "/";
     url.search = "";
     return NextResponse.redirect(url);
   }

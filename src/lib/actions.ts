@@ -15,6 +15,25 @@ function siteUrl() {
   return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 }
 
+/** Where a user lands after auth: admins → admin portal, site users → home. */
+export async function landingPath(): Promise<string> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "/sign-in";
+  const { data } = await supabase
+    .from("company_members")
+    .select("role, status")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle<{ role: string; status: string }>();
+  if (!data) return "/onboarding";
+  if (data.status === "inactive") return "/deactivated";
+  return data.role === "admin" || data.role === "owner" ? "/admin/projects" : "/home";
+}
+
 // ===========================================================================
 // Auth
 // ===========================================================================
@@ -24,14 +43,15 @@ export async function signInAction(
 ): Promise<ActionResult> {
   const email = String(formData.get("email") || "").trim();
   const password = String(formData.get("password") || "");
-  const next = String(formData.get("next") || "/home");
+  const next = String(formData.get("next") || "");
   if (!email || !password) return { error: "Enter your email and password." };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: error.message };
 
-  redirect(next.startsWith("/") ? next : "/home");
+  if (next.startsWith("/")) redirect(next);
+  redirect(await landingPath());
 }
 
 export async function signUpAction(
@@ -83,7 +103,7 @@ export async function signUpAction(
     if (e) return { error: e.message };
   }
 
-  redirect("/home");
+  redirect(await landingPath());
 }
 
 export async function signOutAction() {
@@ -109,7 +129,7 @@ export async function createCompanyAction(
     p_company_name: companyName,
   });
   if (error) return { error: error.message };
-  redirect("/home");
+  redirect(await landingPath());
 }
 
 export async function acceptInviteAction(
@@ -126,7 +146,7 @@ export async function acceptInviteAction(
     p_full_name: fullName,
   });
   if (error) return { error: error.message };
-  redirect("/home");
+  redirect(await landingPath());
 }
 
 // ===========================================================================
@@ -138,6 +158,7 @@ export async function createProjectAction(
 ): Promise<ActionResult> {
   const name = String(formData.get("name") || "").trim();
   const companyId = String(formData.get("company_id") || "");
+  const base = String(formData.get("redirect_base") || "/projects");
   if (!name) return { error: "Enter a project name." };
 
   const supabase = await createClient();
@@ -148,7 +169,8 @@ export async function createProjectAction(
   if (error) return { error: error.message };
 
   revalidatePath("/home");
-  redirect(`/projects/${(data as { id: string }).id}`);
+  revalidatePath("/admin/projects");
+  redirect(`${base}/${(data as { id: string }).id}`);
 }
 
 export async function setProjectStatusAction(
@@ -162,29 +184,59 @@ export async function setProjectStatusAction(
   });
   if (error) return { error: error.message };
   revalidatePath("/home");
-  revalidatePath("/more/archived");
+  revalidatePath("/admin/projects");
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/admin/projects/${projectId}`);
   return { ok: true };
 }
 
-export async function updateProjectMetaAction(
+export async function updateProjectDetailsAction(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const projectId = String(formData.get("project_id") || "");
-  const patch = {
-    name: String(formData.get("name") || "").trim(),
-    project_number: String(formData.get("project_number") || "").trim() || null,
-    client_name: String(formData.get("client_name") || "").trim() || null,
-    site_address: String(formData.get("site_address") || "").trim() || null,
-  };
-  if (!patch.name) return { error: "Project name cannot be empty." };
-
   const supabase = await createClient();
-  const { error } = await supabase.from("projects").update(patch).eq("id", projectId);
+  const { error } = await supabase.rpc("update_project_details", {
+    p_project_id: projectId,
+    p_name: String(formData.get("name") || "").trim(),
+    p_project_number: String(formData.get("project_number") || "").trim() || null,
+    p_client_name: String(formData.get("client_name") || "").trim() || null,
+    p_site_address: String(formData.get("site_address") || "").trim() || null,
+  });
   if (error) return { error: error.message };
-  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath("/admin/projects");
   revalidatePath("/home");
+  return { ok: true };
+}
+
+export async function setProjectTestOverrideAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const projectId = String(formData.get("project_id") || "");
+  const enabled = formData.get("enabled") === "on" || formData.get("enabled") === "true";
+  const num = (k: string) => {
+    const v = formData.get(k);
+    return v === null || v === "" ? null : Number(v);
+  };
+  const int = (k: string) => {
+    const v = num(k);
+    return v === null ? null : Math.round(v);
+  };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_project_test_override", {
+    p_project_id: projectId,
+    p_enabled: enabled,
+    p_initial_pressure_bar: num("initial_pressure_bar"),
+    p_initial_duration_min: int("initial_duration_min"),
+    p_strength_pressure_bar: num("strength_pressure_bar"),
+    p_strength_duration_min: int("strength_duration_min"),
+    p_pressure_pressure_bar: num("pressure_pressure_bar"),
+    p_pressure_duration_min: int("pressure_duration_min"),
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/projects/${projectId}`);
   return { ok: true };
 }
 
@@ -200,6 +252,7 @@ export async function createTestAction(
   const system = String(formData.get("system") || "cold");
   const systemOther = String(formData.get("system_other") || "").trim();
   const area = String(formData.get("area") || "").trim();
+  const base = String(formData.get("redirect_base") || "/projects");
   if (!area) return { error: "Enter the area being tested." };
   if (system === "other" && !systemOther)
     return { error: "Name the system, or pick one from the list." };
@@ -218,7 +271,35 @@ export async function createTestAction(
   if (error) return { error: error.message };
 
   revalidatePath(`/projects/${projectId}`);
-  redirect(`/projects/${projectId}/tests/${(data as { id: string }).id}`);
+  revalidatePath(`/admin/projects/${projectId}`);
+  redirect(`${base}/${projectId}/tests/${(data as { id: string }).id}`);
+}
+
+export async function adminUpdateTestAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const testId = String(formData.get("test_id") || "");
+  const projectId = String(formData.get("project_id") || "");
+  const system = String(formData.get("system") || "cold");
+  const systemOther = String(formData.get("system_other") || "").trim();
+  const area = String(formData.get("area") || "").trim();
+  if (!area) return { error: "Enter the area being tested." };
+  if (system === "other" && !systemOther)
+    return { error: "Name the system, or pick one from the list." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_update_test", {
+    p_test_id: testId,
+    p_floor: String(formData.get("floor") || "0"),
+    p_system: system,
+    p_area: area,
+    p_system_other: systemOther || null,
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/admin/projects/${projectId}/tests/${testId}`);
+  return { ok: true };
 }
 
 export async function updateTestSettingsAction(
@@ -318,22 +399,19 @@ export async function voidTestAction(
   return { ok: true };
 }
 
-export async function createRetestAction(testId: string): Promise<ActionResult> {
+export async function createRetestAction(
+  testId: string,
+  base: "/projects" | "/admin/projects" = "/projects",
+): Promise<ActionResult> {
   const supabase = await createClient();
-  const { data: src } = await supabase
-    .from("pressure_tests")
-    .select("project_id")
-    .eq("id", testId)
-    .single<{ project_id: string }>();
-
   const { data, error } = await supabase
     .rpc("create_retest", { p_test_id: testId })
     .select()
     .single<PressureTest>();
   if (error) return { error: error.message };
 
-  if (src) revalidatePath(`/projects/${src.project_id}`);
-  redirect(`/projects/${data!.project_id}/tests/${data!.id}`);
+  revalidatePath("/", "layout");
+  redirect(`${base}/${data!.project_id}/tests/${data!.id}`);
 }
 
 // ===========================================================================
@@ -344,21 +422,56 @@ export async function createInviteAction(
   formData: FormData,
 ): Promise<ActionResult & { link?: string }> {
   const companyId = String(formData.get("company_id") || "");
+  const fullName = String(formData.get("full_name") || "").trim();
   const email = String(formData.get("email") || "").trim();
+  const role = formData.get("role") === "admin" ? "admin" : "member";
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .rpc("create_invite", {
       p_company_id: companyId,
+      p_full_name: fullName || null,
       p_email: email || null,
-      p_role: "member",
+      p_role: role,
     })
     .select()
     .single<{ token: string }>();
   if (error) return { error: error.message };
 
-  revalidatePath("/more/team");
+  revalidatePath("/admin/users");
   return { ok: true, link: `${siteUrl()}/sign-up?invite=${data!.token}` };
+}
+
+export async function setMemberStatusAction(
+  companyId: string,
+  userId: string,
+  status: "active" | "inactive",
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_member_status", {
+    p_company_id: companyId,
+    p_user_id: userId,
+    p_status: status,
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/admin/users");
+  return { ok: true };
+}
+
+export async function setMemberRoleAction(
+  companyId: string,
+  userId: string,
+  role: "admin" | "member",
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_member_role", {
+    p_company_id: companyId,
+    p_user_id: userId,
+    p_role: role,
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/admin/users");
+  return { ok: true };
 }
 
 export async function updateCompanyAction(
@@ -379,7 +492,21 @@ export async function updateCompanyAction(
   const supabase = await createClient();
   const { error } = await supabase.from("companies").update(patch).eq("id", companyId);
   if (error) return { error: error.message };
-  revalidatePath("/more/company");
+  revalidatePath("/admin/company");
+  return { ok: true };
+}
+
+export async function updateCompanyLogoAction(
+  companyId: string,
+  logoPath: string | null,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("companies")
+    .update({ logo_path: logoPath })
+    .eq("id", companyId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/company");
   return { ok: true };
 }
 
@@ -404,7 +531,7 @@ export async function updateTestProfileAction(
     })
     .eq("id", profileId);
   if (error) return { error: error.message };
-  revalidatePath("/more/company");
+  revalidatePath("/admin/company");
   return { ok: true };
 }
 

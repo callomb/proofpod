@@ -17,13 +17,20 @@ function Submit() {
   );
 }
 
-export function NewTestForm({ projectId }: { projectId: string }) {
+export function NewTestForm({
+  projectId,
+  redirectBase = "/projects",
+}: {
+  projectId: string;
+  redirectBase?: string;
+}) {
   const [state, action] = useActionState<ActionResult, FormData>(createTestAction, {});
   const [system, setSystem] = useState<SystemKind>("cold");
 
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="project_id" value={projectId} />
+      <input type="hidden" name="redirect_base" value={redirectBase} />
 
       <Field label="Floor">
         <select name="floor" defaultValue={DEFAULT_FLOOR} className={inputClass}>
