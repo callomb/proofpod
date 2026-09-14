@@ -114,15 +114,20 @@ export function LinkButton({
 export function Field({
   label,
   hint,
+  required,
   children,
 }: {
   label: string;
   hint?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">{label}</span>
+      <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">
+        {label}
+        {required ? <span className="text-fail"> *</span> : null}
+      </span>
       {children}
       {hint ? <span className="mt-1 block text-[12px] text-muted">{hint}</span> : null}
     </label>

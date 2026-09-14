@@ -26,9 +26,22 @@ export function NewTestForm({
 }) {
   const [state, action] = useActionState<ActionResult, FormData>(createTestAction, {});
   const [system, setSystem] = useState<SystemKind>("cold");
+  const [clientError, setClientError] = useState<string | null>(null);
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      action={action}
+      onSubmit={(e) => {
+        const area = new FormData(e.currentTarget).get("area");
+        if (!String(area ?? "").trim()) {
+          e.preventDefault();
+          setClientError("Enter the area being tested.");
+          return;
+        }
+        setClientError(null);
+      }}
+      className="space-y-5"
+    >
       <input type="hidden" name="project_id" value={projectId} />
       <input type="hidden" name="redirect_base" value={redirectBase} />
 
@@ -79,17 +92,18 @@ export function NewTestForm({
         </Field>
       ) : null}
 
-      <Field label="Area" hint="Free text — wherever you're testing.">
+      <Field label="Area" required hint="Required — wherever you're testing.">
         <input
           name="area"
           required
+          aria-required="true"
           className={inputClass}
           placeholder="Male WCs"
           autoComplete="off"
         />
       </Field>
 
-      <FormError>{state.error}</FormError>
+      <FormError>{clientError ?? state.error}</FormError>
       <Submit />
     </form>
   );
