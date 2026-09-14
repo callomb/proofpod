@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "./supabase/server";
+import { isEmailInput, usernameToEmail } from "./domain";
 import type { PressureTest, ProjectStatus } from "./types";
 
 export interface ActionResult {
@@ -22,6 +23,14 @@ export async function landingPath(): Promise<string> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return "/sign-in";
+
+  const { data: platformAdmin } = await supabase
+    .from("platform_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (platformAdmin) return "/platform";
+
   const { data } = await supabase
     .from("company_members")
     .select("role, status")
@@ -41,14 +50,16 @@ export async function signInAction(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const email = String(formData.get("email") || "").trim();
+  const identifier = String(formData.get("email") || "").trim();
   const password = String(formData.get("password") || "");
   const next = String(formData.get("next") || "");
-  if (!email || !password) return { error: "Enter your email and password." };
+  if (!identifier || !password) return { error: "Enter your username/email and password." };
+
+  const email = isEmailInput(identifier) ? identifier : usernameToEmail(identifier);
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: error.message };
+  if (error) return { error: "That username/email or password wasn't recognised." };
 
   if (next.startsWith("/")) redirect(next);
   redirect(await landingPath());

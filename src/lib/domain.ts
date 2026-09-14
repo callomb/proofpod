@@ -121,3 +121,39 @@ export const TEST_STATUS_META = {
   failed: { label: "Failed", tone: "fail" as const },
   void: { label: "Void", tone: "void" as const },
 };
+
+// ---------------------------------------------------------------------------
+// Username-based accounts
+//
+// Supabase Auth identities are always an email address under the hood. For
+// staff who sign in with a username (no real email), we derive a synthetic,
+// unreachable address from the username. Anything containing "@" on the
+// sign-in form is treated as a real email instead.
+// ---------------------------------------------------------------------------
+const USERNAME_EMAIL_DOMAIN = "users.proofpod.internal";
+
+export function normalizeUsername(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+export function isValidUsername(raw: string): boolean {
+  const u = normalizeUsername(raw);
+  return /^[a-z0-9](?:[a-z0-9._-]{1,30})[a-z0-9]$/.test(u);
+}
+
+export function usernameToEmail(raw: string): string {
+  return `${normalizeUsername(raw)}@${USERNAME_EMAIL_DOMAIN}`;
+}
+
+export function isEmailInput(raw: string): boolean {
+  return raw.includes("@") && !raw.trim().toLowerCase().endsWith(`@${USERNAME_EMAIL_DOMAIN}`);
+}
+
+/** Generates an easy-to-read one-time password, e.g. "TAMP-4821-FOX". */
+export function generatePassword(): string {
+  const words = ["TAMP", "RIVET", "GAUGE", "VALVE", "BRICK", "TORCH", "FLUX", "COIL", "BOLT", "SEAL"];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const digits = Math.floor(1000 + Math.random() * 9000);
+  const tail = ["FOX", "OAK", "RIG", "BAY", "ELM", "TIN"][Math.floor(Math.random() * 6)];
+  return `${word}-${digits}-${tail}`;
+}
