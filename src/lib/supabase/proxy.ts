@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Public routes that never require a session. */
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth"];
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth", "/api"];
 
 function isPublic(pathname: string) {
   if (pathname === "/") return true;
