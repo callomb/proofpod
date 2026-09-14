@@ -23,13 +23,13 @@ export default async function AdminUsersPage() {
 
   const { data: profileRows } = await supabase
     .from("profiles")
-    .select("id, full_name, email")
+    .select("id, full_name, username")
     .in(
       "id",
       rows.length ? rows.map((r) => r.user_id) : ["00000000-0000-0000-0000-000000000000"],
     );
   const profiles = new Map(
-    ((profileRows ?? []) as { id: string; full_name: string; email: string | null }[]).map(
+    ((profileRows ?? []) as { id: string; full_name: string; username: string | null }[]).map(
       (p) => [p.id, p],
     ),
   );
@@ -37,7 +37,7 @@ export default async function AdminUsersPage() {
   const members: MemberView[] = rows.map((r) => ({
     user_id: r.user_id,
     full_name: profiles.get(r.user_id)?.full_name ?? "",
-    email: profiles.get(r.user_id)?.email ?? null,
+    username: profiles.get(r.user_id)?.username ?? null,
     role: r.role === "admin" || r.role === "owner" ? "admin" : "member",
     status: r.status === "inactive" ? "inactive" : "active",
   }));

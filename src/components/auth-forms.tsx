@@ -25,15 +25,16 @@ export function SignInForm({ next }: { next: string }) {
   return (
     <form action={action} className="space-y-4">
       {next ? <input type="hidden" name="next" value={next} /> : null}
-      <Field label="Email">
+      <Field label="Email or username">
         <input
           name="email"
-          type="email"
-          autoComplete="email"
-          inputMode="email"
+          type="text"
+          autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
           required
           className={inputClass}
-          placeholder="you@company.co.uk"
+          placeholder="you@company.co.uk or dave"
         />
       </Field>
       <Field label="Password">
