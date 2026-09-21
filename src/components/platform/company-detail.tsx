@@ -12,9 +12,20 @@ import { roleLabel } from "@/lib/types";
 import type { MemberWithProfile } from "@/lib/platform";
 import { Button, Card, StatusDot } from "@/components/ui";
 import { Sheet } from "@/components/app-shell";
+import { ActivityLine, type ActivityView } from "@/components/activity-line";
 import { CredentialsPanel } from "./credentials-panel";
 
-function MemberCard({ m, companyId }: { m: MemberWithProfile; companyId: string }) {
+function MemberCard({
+  m,
+  companyId,
+  activity,
+  trackingSince,
+}: {
+  m: MemberWithProfile;
+  companyId: string;
+  activity?: ActivityView;
+  trackingSince: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +53,8 @@ function MemberCard({ m, companyId }: { m: MemberWithProfile; companyId: string 
           </div>
         </div>
       </div>
+
+      <ActivityLine activity={activity} trackingSince={trackingSince} />
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
@@ -103,11 +116,15 @@ export function CompanyDetail({
   companyName,
   members,
   projectCount,
+  activity,
+  trackingSince,
 }: {
   companyId: string;
   companyName: string;
   members: MemberWithProfile[];
   projectCount: number;
+  activity: Record<string, ActivityView>;
+  trackingSince: string;
 }) {
   return (
     <div>
@@ -118,7 +135,13 @@ export function CompanyDetail({
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {members.map((m) => (
-          <MemberCard key={m.membership.user_id} m={m} companyId={companyId} />
+          <MemberCard
+            key={m.membership.user_id}
+            m={m}
+            companyId={companyId}
+            activity={activity[m.membership.user_id]}
+            trackingSince={trackingSince}
+          />
         ))}
       </div>
     </div>

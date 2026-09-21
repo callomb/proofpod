@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "./supabase/server";
+import { createAdminClient } from "./supabase/admin";
 import { isEmailInput, usernameToEmail } from "./domain";
 import type { PressureTest, ProjectStatus } from "./types";
 
@@ -60,6 +61,29 @@ export async function signInAction(
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "That username/email or password wasn't recognised." };
+
+  // Record the sign-in (best effort — never blocks logging in).
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const admin = createAdminClient();
+      const { data: m } = await admin
+        .from("company_members")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle<{ company_id: string }>();
+      if (m) {
+        await admin
+          .from("audit_events")
+          .insert({ company_id: m.company_id, actor_id: user.id, event_type: "login" });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
 
   if (next.startsWith("/")) redirect(next);
   redirect(await landingPath());
