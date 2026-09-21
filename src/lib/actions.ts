@@ -339,6 +339,12 @@ export async function updateTestSettingsAction(
   });
   if (error) return { error: error.message };
 
+  const { error: showErr } = await supabase.rpc("set_test_show_all_stages", {
+    p_test_id: testId,
+    p_show: formData.get("show_all_stages") === "on",
+  });
+  if (showErr) return { error: showErr.message };
+
   if (test) revalidatePath(`/projects/${test.project_id}/tests/${testId}`);
   return { ok: true };
 }
@@ -539,6 +545,7 @@ export async function updateTestProfileAction(
       strength_duration_min: int("strength_duration_min"),
       pressure_pressure_bar: num("pressure_pressure_bar"),
       pressure_duration_min: int("pressure_duration_min"),
+      show_all_stages: formData.get("show_all_stages") === "on",
     })
     .eq("id", profileId);
   if (error) return { error: error.message };

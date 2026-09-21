@@ -359,6 +359,20 @@ function SettingsSheet({
             </div>
           </div>
         ))}
+        <label className="flex items-start gap-2.5 text-[14px]">
+          <input
+            type="checkbox"
+            name="show_all_stages"
+            defaultChecked={test.show_all_stages}
+            className="mt-0.5 size-4"
+          />
+          <span>
+            Show Initial &amp; Strength tests
+            <span className="block text-[12px] text-muted">
+              Adds the other two test cards to this test.
+            </span>
+          </span>
+        </label>
         <FormError>{error}</FormError>
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending ? "Saving…" : "Save for this test"}
@@ -461,9 +475,13 @@ export function TestDetail({
   const [voidPending, startVoid] = useTransition();
 
   const statusMeta = TEST_STATUS_META[test.status];
-  const orderedStages = STAGE_ORDER.map((k) => stages.find((s) => s.stage === k)).filter(
-    Boolean,
-  ) as TestStage[];
+  // Initial/Strength are hidden unless switched on for this test — but never hide
+  // a stage that already has evidence.
+  const orderedStages = (
+    STAGE_ORDER.map((k) => stages.find((s) => s.stage === k)).filter(Boolean) as TestStage[]
+  ).filter(
+    (s) => test.show_all_stages || s.stage === "pressure" || s.status !== "not_started",
+  );
 
   return (
     <div>
