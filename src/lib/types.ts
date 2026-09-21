@@ -74,6 +74,7 @@ export interface TestProfile {
   strength_duration_min: number;
   pressure_pressure_bar: number;
   pressure_duration_min: number;
+  show_all_stages: boolean;
   created_at: string;
   created_by: string | null;
   updated_at: string;
@@ -132,6 +133,7 @@ export interface PressureTest {
   strength_duration_min: number;
   pressure_pressure_bar: number;
   pressure_duration_min: number;
+  show_all_stages: boolean;
   created_at: string;
   created_by: string | null;
   updated_at: string;

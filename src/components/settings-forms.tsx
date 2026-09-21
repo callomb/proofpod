@@ -111,6 +111,21 @@ export function TestProfileForm({ profile }: { profile: TestProfile }) {
           </div>
         </div>
       ))}
+      <label className="flex items-start gap-2.5 text-[14px]">
+        <input
+          type="checkbox"
+          name="show_all_stages"
+          defaultChecked={profile.show_all_stages}
+          className="mt-0.5 size-4"
+        />
+        <span>
+          Show Initial &amp; Strength tests on new tests
+          <span className="block text-[12px] text-muted">
+            Off = site users only see the Pressure Test. They can still switch the others on
+            for an individual test from its gear icon.
+          </span>
+        </span>
+      </label>
       <p className="text-[12px] text-muted">
         Company defaults. New projects and tests start from these values. They&rsquo;re not a
         compliance standard.
