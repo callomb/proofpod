@@ -1,6 +1,7 @@
 import { UsersPanel, type MemberView } from "@/components/admin/users-panel";
 import { getWorkspace } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
+import { TRACKING_SINCE, getMemberActivity } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +35,16 @@ export default async function AdminUsersPage() {
     ),
   );
 
+  const activity = await getMemberActivity(rows.map((r) => r.user_id));
+
   const members: MemberView[] = rows.map((r) => ({
     user_id: r.user_id,
     full_name: profiles.get(r.user_id)?.full_name ?? "",
     username: profiles.get(r.user_id)?.username ?? null,
     role: r.role === "admin" || r.role === "owner" ? "admin" : "member",
     status: r.status === "inactive" ? "inactive" : "active",
+    activity: activity[r.user_id],
   }));
 
-  return <UsersPanel members={members} companyId={company.id} currentUserId={user.id} />;
+  return <UsersPanel members={members} companyId={company.id} currentUserId={user.id} trackingSince={TRACKING_SINCE} />;
 }

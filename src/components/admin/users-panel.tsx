@@ -12,6 +12,7 @@ import {
 import { generatePassword, initials } from "@/lib/domain";
 import { Button, Card, Field, FormError, StatusDot, inputClass } from "@/components/ui";
 import { Sheet } from "@/components/app-shell";
+import { ActivityLine, type ActivityView } from "@/components/activity-line";
 import { CredentialsPanel } from "@/components/platform/credentials-panel";
 
 export interface MemberView {
@@ -20,16 +21,19 @@ export interface MemberView {
   username: string | null;
   role: "admin" | "member";
   status: "active" | "inactive";
+  activity?: ActivityView;
 }
 
 function MemberCard({
   m,
   companyId,
   isSelf,
+  trackingSince,
 }: {
   m: MemberView;
   companyId: string;
   isSelf: boolean;
+  trackingSince: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -73,6 +77,8 @@ function MemberCard({
           </div>
         </div>
       </div>
+
+      <ActivityLine activity={m.activity} trackingSince={trackingSince} />
 
       {!isSelf ? (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -221,10 +227,12 @@ export function UsersPanel({
   members,
   companyId,
   currentUserId,
+  trackingSince,
 }: {
   members: MemberView[];
   companyId: string;
   currentUserId: string;
+  trackingSince: string;
 }) {
   return (
     <div>
@@ -236,6 +244,7 @@ export function UsersPanel({
             m={m}
             companyId={companyId}
             isSelf={m.user_id === currentUserId}
+            trackingSince={trackingSince}
           />
         ))}
       </div>

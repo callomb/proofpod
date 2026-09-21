@@ -4,6 +4,7 @@ import { CompanyDetail } from "@/components/platform/company-detail";
 import { BackLink } from "@/components/ui";
 import { getCompanyForPlatform, listCompanyMembersForPlatform } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { TRACKING_SINCE, getMemberActivity } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export default async function PlatformCompanyPage(props: PageProps<"/platform/co
       .then(({ count }) => count ?? 0),
   ]);
 
+  const activity = await getMemberActivity(members.map((m) => m.membership.user_id));
+
   return (
     <div>
       <div className="mb-3">
@@ -31,6 +34,8 @@ export default async function PlatformCompanyPage(props: PageProps<"/platform/co
         companyName={company.name}
         members={members}
         projectCount={projectCount}
+        activity={activity}
+        trackingSince={TRACKING_SINCE}
       />
     </div>
   );
