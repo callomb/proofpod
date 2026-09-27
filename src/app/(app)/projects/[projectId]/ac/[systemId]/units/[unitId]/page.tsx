@@ -29,7 +29,7 @@ export default async function AcUnitPage(
         projectId={projectId}
         acSystemId={systemId}
         role={unit.unit_role}
-        showReference={unit.unit_role === "indoor"}
+        showReference
         showLocation={unit.unit_role === "indoor"}
       />
     </div>

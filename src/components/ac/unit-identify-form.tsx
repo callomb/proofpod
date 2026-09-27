@@ -112,12 +112,15 @@ export function UnitIdentifyForm({
   return (
     <div className="space-y-5">
       {showReference ? (
-        <Field label="Unit reference" hint="e.g. FCU-01">
+        <Field
+          label="Unit reference"
+          hint={role === "outdoor" ? "e.g. OD-01" : "e.g. FCU-01"}
+        >
           <input
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             className={inputClass}
-            placeholder="FCU-01"
+            placeholder={role === "outdoor" ? "OD-01" : "FCU-01"}
           />
         </Field>
       ) : null}
@@ -132,18 +135,17 @@ export function UnitIdentifyForm({
         </Field>
       ) : null}
 
-      <Field label="Asset number">
-        <div className="flex gap-2">
-          <input
-            value={assetNumber}
-            onChange={(e) => setAssetNumber(e.target.value)}
-            className={inputClass}
-            placeholder="Enter or scan"
-            autoComplete="off"
-          />
-          <QrScanButton onScan={(v) => setAssetNumber(v)} label="Scan" />
-        </div>
-      </Field>
+      <div>
+        <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Asset number</span>
+        <QrScanButton onScan={(v) => setAssetNumber(v)} label={assetNumber ? "Scan again" : "Scan QR label"} full />
+        <input
+          value={assetNumber}
+          onChange={(e) => setAssetNumber(e.target.value)}
+          className={`${inputClass} mt-2`}
+          placeholder="Or enter manually"
+          autoComplete="off"
+        />
+      </div>
 
       <Card className="p-4">
         <p className="mb-3 text-[13px] font-medium text-ink-soft">Data plate</p>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { updateAcCommissioningAction, upsertAcTemperatureReadingAction } from "@/lib/ac/actions";
 import type { AcCommissioning, AcTemperatureReading, AcUnit } from "@/lib/ac/types";
-import { Card, FormError, Muted, inputClass } from "../ui";
+import { Button, Card, FormError, Muted, inputClass } from "../ui";
 
 type Fields = Parameters<typeof updateAcCommissioningAction>[1];
 
@@ -31,23 +31,38 @@ function Checkbox({
   );
 }
 
-function NumField({
+function TextField({
   label,
   value,
-  onCommit,
+  onChange,
 }: {
   label: string;
   value: string;
-  onCommit: (v: string) => void;
+  onChange: (v: string) => void;
 }) {
-  const [local, setLocal] = useState(value);
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">{label}</span>
+      <input value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+    </label>
+  );
+}
+
+function NumField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <label className="block">
       <span className="mb-1 block text-[11px] text-muted">{label}</span>
       <input
-        value={local}
-        onChange={(e) => setLocal(e.target.value)}
-        onBlur={() => onCommit(local)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         inputMode="decimal"
         className={inputClass}
       />
@@ -56,13 +71,17 @@ function NumField({
 }
 
 export function CommissioningPanel({
+  projectId,
   acSystemId,
+  systemRef,
   commissioning,
   indoorUnits,
   temperatureReadings,
   memberNames,
 }: {
+  projectId: string;
   acSystemId: string;
+  systemRef: string;
   commissioning: AcCommissioning;
   indoorUnits: AcUnit[];
   temperatureReadings: AcTemperatureReading[];
@@ -70,18 +89,57 @@ export function CommissioningPanel({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [saveBusy, setSaveBusy] = useState(false);
 
-  const save = async (fields: Fields) => {
+  // Checkboxes save immediately (a click is a reliable, unambiguous commit).
+  const saveCheck = async (fields: Fields) => {
     setError(null);
     const res = await updateAcCommissioningAction(acSystemId, fields);
     if (res.error) setError(res.error);
     else router.refresh();
   };
 
-  const [mcb, setMcb] = useState(commissioning.mcb_fuse_spec ?? "");
-  const [flc, setFlc] = useState(commissioning.outdoor_nameplate_flc_amps?.toString() ?? "");
-  const [suction, setSuction] = useState(commissioning.suction_pipe_size ?? "");
-  const [liquid, setLiquid] = useState(commissioning.liquid_pipe_size ?? "");
+  // Everything else is typed then committed together with one explicit Save —
+  // relying on onBlur alone lost data when a field was filled and the page
+  // was left without that exact field losing focus first.
+  const [form, setForm] = useState({
+    mcb: commissioning.mcb_fuse_spec ?? "",
+    flc: commissioning.outdoor_nameplate_flc_amps?.toString() ?? "",
+    suction: commissioning.suction_pipe_size ?? "",
+    liquid: commissioning.liquid_pipe_size ?? "",
+    coolingL1: commissioning.current_cooling_l1?.toString() ?? "",
+    coolingL2: commissioning.current_cooling_l2?.toString() ?? "",
+    coolingL3: commissioning.current_cooling_l3?.toString() ?? "",
+    heatingL1: commissioning.current_heating_l1?.toString() ?? "",
+    heatingL2: commissioning.current_heating_l2?.toString() ?? "",
+    heatingL3: commissioning.current_heating_l3?.toString() ?? "",
+  });
+  const set = (key: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
+  const num = (v: string) => (v ? Number(v) : undefined);
+
+  const saveDetails = async (thenNavigate: boolean) => {
+    setSaveBusy(true);
+    setError(null);
+    const res = await updateAcCommissioningAction(acSystemId, {
+      mcbFuseSpec: form.mcb,
+      outdoorNameplateFlcAmps: num(form.flc),
+      suctionPipeSize: form.suction,
+      liquidPipeSize: form.liquid,
+      currentCoolingL1: num(form.coolingL1),
+      currentCoolingL2: num(form.coolingL2),
+      currentCoolingL3: num(form.coolingL3),
+      currentHeatingL1: num(form.heatingL1),
+      currentHeatingL2: num(form.heatingL2),
+      currentHeatingL3: num(form.heatingL3),
+    });
+    setSaveBusy(false);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    if (thenNavigate) router.push(`/projects/${projectId}/ac/${acSystemId}`);
+    else router.refresh();
+  };
 
   return (
     <div className="space-y-4">
@@ -92,32 +150,32 @@ export function CommissioningPanel({
           <Checkbox
             label="Transit brackets removed"
             checked={!!commissioning.transit_brackets_removed}
-            onChange={(v) => save({ transitBracketsRemoved: v })}
+            onChange={(v) => saveCheck({ transitBracketsRemoved: v })}
           />
           <Checkbox
             label="Electrical / fly-lead connections tight"
             checked={!!commissioning.electrical_connections_tight}
-            onChange={(v) => save({ electricalConnectionsTight: v })}
+            onChange={(v) => saveCheck({ electricalConnectionsTight: v })}
           />
           <Checkbox
             label="Local isolator fitted"
             checked={!!commissioning.local_isolator_fitted}
-            onChange={(v) => save({ localIsolatorFitted: v })}
+            onChange={(v) => saveCheck({ localIsolatorFitted: v })}
           />
           <Checkbox
             label="Equipment labelled"
             checked={!!commissioning.equipment_labelled}
-            onChange={(v) => save({ equipmentLabelled: v })}
+            onChange={(v) => saveCheck({ equipmentLabelled: v })}
           />
           <Checkbox
             label="Covers fixed and clean"
             checked={!!commissioning.covers_fixed_clean}
-            onChange={(v) => save({ coversFixedClean: v })}
+            onChange={(v) => saveCheck({ coversFixedClean: v })}
           />
           <Checkbox
             label="Functional test satisfactory"
             checked={!!commissioning.functional_test_satisfactory}
-            onChange={(v) => save({ functionalTestSatisfactory: v })}
+            onChange={(v) => saveCheck({ functionalTestSatisfactory: v })}
           />
         </div>
       </Card>
@@ -125,28 +183,16 @@ export function CommissioningPanel({
       <Card className="p-4">
         <p className="mb-3 text-[14px] font-semibold">Electrical</p>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">MCB / fuse size &amp; type</span>
-            <input value={mcb} onChange={(e) => setMcb(e.target.value)} onBlur={() => save({ mcbFuseSpec: mcb })} className={inputClass} />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Outdoor nameplate FLC (A)</span>
-            <input value={flc} onChange={(e) => setFlc(e.target.value)} onBlur={() => save({ outdoorNameplateFlcAmps: Number(flc) || undefined })} inputMode="decimal" className={inputClass} />
-          </label>
+          <TextField label="MCB / fuse size & type" value={form.mcb} onChange={set("mcb")} />
+          <NumField label="Outdoor nameplate FLC (A)" value={form.flc} onChange={set("flc")} />
         </div>
       </Card>
 
       <Card className="p-4">
         <p className="mb-3 text-[14px] font-semibold">Pipework</p>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Suction pipe size</span>
-            <input value={suction} onChange={(e) => setSuction(e.target.value)} onBlur={() => save({ suctionPipeSize: suction })} className={inputClass} />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Liquid pipe size</span>
-            <input value={liquid} onChange={(e) => setLiquid(e.target.value)} onBlur={() => save({ liquidPipeSize: liquid })} className={inputClass} />
-          </label>
+          <TextField label="Suction pipe size" value={form.suction} onChange={set("suction")} />
+          <TextField label="Liquid pipe size" value={form.liquid} onChange={set("liquid")} />
         </div>
       </Card>
 
@@ -154,9 +200,9 @@ export function CommissioningPanel({
         <p className="mb-1 text-[14px] font-semibold">Running current — Cooling</p>
         <Muted className="mb-3 block">Leave irrelevant phases blank</Muted>
         <div className="grid grid-cols-3 gap-3">
-          <NumField label="L1 (A)" value={commissioning.current_cooling_l1?.toString() ?? ""} onCommit={(v) => save({ currentCoolingL1: v ? Number(v) : undefined })} />
-          <NumField label="L2 (A)" value={commissioning.current_cooling_l2?.toString() ?? ""} onCommit={(v) => save({ currentCoolingL2: v ? Number(v) : undefined })} />
-          <NumField label="L3 (A)" value={commissioning.current_cooling_l3?.toString() ?? ""} onCommit={(v) => save({ currentCoolingL3: v ? Number(v) : undefined })} />
+          <NumField label="L1 (A)" value={form.coolingL1} onChange={set("coolingL1")} />
+          <NumField label="L2 (A)" value={form.coolingL2} onChange={set("coolingL2")} />
+          <NumField label="L3 (A)" value={form.coolingL3} onChange={set("coolingL3")} />
         </div>
       </Card>
 
@@ -164,11 +210,15 @@ export function CommissioningPanel({
         <p className="mb-1 text-[14px] font-semibold">Running current — Heating</p>
         <Muted className="mb-3 block">Leave irrelevant phases blank</Muted>
         <div className="grid grid-cols-3 gap-3">
-          <NumField label="L1 (A)" value={commissioning.current_heating_l1?.toString() ?? ""} onCommit={(v) => save({ currentHeatingL1: v ? Number(v) : undefined })} />
-          <NumField label="L2 (A)" value={commissioning.current_heating_l2?.toString() ?? ""} onCommit={(v) => save({ currentHeatingL2: v ? Number(v) : undefined })} />
-          <NumField label="L3 (A)" value={commissioning.current_heating_l3?.toString() ?? ""} onCommit={(v) => save({ currentHeatingL3: v ? Number(v) : undefined })} />
+          <NumField label="L1 (A)" value={form.heatingL1} onChange={set("heatingL1")} />
+          <NumField label="L2 (A)" value={form.heatingL2} onChange={set("heatingL2")} />
+          <NumField label="L3 (A)" value={form.heatingL3} onChange={set("heatingL3")} />
         </div>
       </Card>
+
+      <Button size="lg" className="w-full" disabled={saveBusy} onClick={() => saveDetails(false)}>
+        {saveBusy ? "Saving…" : "Save electrical, pipework & currents"}
+      </Button>
 
       {indoorUnits.map((unit) => (
         <TemperatureCard
@@ -179,6 +229,16 @@ export function CommissioningPanel({
           memberNames={memberNames}
         />
       ))}
+
+      <Button
+        size="lg"
+        variant="secondary"
+        className="w-full"
+        disabled={saveBusy}
+        onClick={() => saveDetails(true)}
+      >
+        Done — back to {systemRef}
+      </Button>
     </div>
   );
 }
@@ -196,13 +256,7 @@ function TemperatureCard({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-
-  const save = async (mode: "cooling" | "heating", airOnC?: number, airOffC?: number) => {
-    setError(null);
-    const res = await upsertAcTemperatureReadingAction({ acUnitId: unit.id, mode, airOnC, airOffC });
-    if (res.error) setError(res.error);
-    else router.refresh();
-  };
+  const [busy, setBusy] = useState(false);
 
   const [coolOn, setCoolOn] = useState(cooling?.air_on_c?.toString() ?? "");
   const [coolOff, setCoolOff] = useState(cooling?.air_off_c?.toString() ?? "");
@@ -211,6 +265,29 @@ function TemperatureCard({
 
   const coolingDelta = coolOn && coolOff ? (Number(coolOn) - Number(coolOff)).toFixed(1) : null;
   const heatingDelta = heatOn && heatOff ? (Number(heatOff) - Number(heatOn)).toFixed(1) : null;
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    const results = await Promise.all([
+      upsertAcTemperatureReadingAction({
+        acUnitId: unit.id,
+        mode: "cooling",
+        airOnC: coolOn ? Number(coolOn) : undefined,
+        airOffC: coolOff ? Number(coolOff) : undefined,
+      }),
+      upsertAcTemperatureReadingAction({
+        acUnitId: unit.id,
+        mode: "heating",
+        airOnC: heatOn ? Number(heatOn) : undefined,
+        airOffC: heatOff ? Number(heatOff) : undefined,
+      }),
+    ]);
+    setBusy(false);
+    const failed = results.find((r) => r.error);
+    if (failed) setError(failed.error!);
+    else router.refresh();
+  };
 
   return (
     <Card className="p-4">
@@ -221,8 +298,8 @@ function TemperatureCard({
 
       <p className="mb-1.5 text-[13px] font-medium text-ink-soft">Cooling</p>
       <div className="grid grid-cols-2 gap-3">
-        <NumField label="Air on (°C)" value={coolOn} onCommit={(v) => { setCoolOn(v); save("cooling", v ? Number(v) : undefined, coolOff ? Number(coolOff) : undefined); }} />
-        <NumField label="Air off (°C)" value={coolOff} onCommit={(v) => { setCoolOff(v); save("cooling", coolOn ? Number(coolOn) : undefined, v ? Number(v) : undefined); }} />
+        <NumField label="Air on (°C)" value={coolOn} onChange={setCoolOn} />
+        <NumField label="Air off (°C)" value={coolOff} onChange={setCoolOff} />
       </div>
       {coolingDelta !== null ? <Muted className="mt-1.5 block">Cooling ΔT: {coolingDelta}°C</Muted> : null}
       {cooling?.recorded_by ? (
@@ -231,13 +308,17 @@ function TemperatureCard({
 
       <p className="mb-1.5 mt-4 text-[13px] font-medium text-ink-soft">Heating</p>
       <div className="grid grid-cols-2 gap-3">
-        <NumField label="Air on (°C)" value={heatOn} onCommit={(v) => { setHeatOn(v); save("heating", v ? Number(v) : undefined, heatOff ? Number(heatOff) : undefined); }} />
-        <NumField label="Air off (°C)" value={heatOff} onCommit={(v) => { setHeatOff(v); save("heating", heatOn ? Number(heatOn) : undefined, v ? Number(v) : undefined); }} />
+        <NumField label="Air on (°C)" value={heatOn} onChange={setHeatOn} />
+        <NumField label="Air off (°C)" value={heatOff} onChange={setHeatOff} />
       </div>
       {heatingDelta !== null ? <Muted className="mt-1.5 block">Heating ΔT: {heatingDelta}°C</Muted> : null}
       {heating?.recorded_by ? (
         <Muted className="mt-0.5 block">{memberNames[heating.recorded_by] ?? "Someone"} · {heating.recorded_at ? new Date(heating.recorded_at).toLocaleDateString("en-GB") : ""}</Muted>
       ) : null}
+
+      <Button size="sm" variant="secondary" className="mt-4" disabled={busy} onClick={save}>
+        {busy ? "Saving…" : "Save temperatures"}
+      </Button>
     </Card>
   );
 }

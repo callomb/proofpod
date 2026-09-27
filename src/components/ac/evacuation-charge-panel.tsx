@@ -317,6 +317,9 @@ function ChargeSection({
       </div>
 
       <FormError>{error}</FormError>
+      <Button size="lg" className="mt-4 w-full" disabled={busy} onClick={() => saveField()}>
+        {busy ? "Saving…" : "Save charge details"}
+      </Button>
     </Card>
   );
 }

@@ -15,14 +15,23 @@ import { Button, FormError } from "../ui";
 export function QrScanButton({
   onScan,
   label = "Scan QR",
+  full = false,
 }: {
   onScan: (value: string) => void;
   label?: string;
+  /** Full-width, primary-styled — for when scanning is the lead action, not a fallback. */
+  full?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant={full ? "primary" : "secondary"}
+        size={full ? "lg" : "sm"}
+        className={full ? "w-full" : undefined}
+        onClick={() => setOpen(true)}
+      >
         {label}
       </Button>
       <QrScanSheet

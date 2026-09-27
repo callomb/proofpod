@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { DrainTestPanel } from "@/components/ac/drain-test-panel";
-import { BackLink } from "@/components/ui";
+import { BackLink, LinkButton } from "@/components/ui";
 import { getAcSystem, listAcDrainTests, listAcUnits } from "@/lib/ac/data";
 import { indoorUnits } from "@/lib/ac/domain";
 import { getWorkspace } from "@/lib/data";
@@ -24,6 +24,9 @@ export default async function AcDrainTestPage(
       </div>
       <h1 className="mb-5 text-[24px] font-semibold tracking-tight">Drain Test</h1>
       <DrainTestPanel units={indoorUnits(units)} drainTests={drainTests} memberNames={memberNames} />
+      <LinkButton href={`/projects/${projectId}/ac/${systemId}`} size="lg" className="mt-6 w-full">
+        Done — back to {system.system_ref}
+      </LinkButton>
     </div>
   );
 }

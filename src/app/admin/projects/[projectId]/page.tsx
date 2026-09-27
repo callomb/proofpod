@@ -119,11 +119,23 @@ export default async function AdminProjectPage(
       ) : null}
 
       {tab === "certificates" ? (
-        <CertificatesPanel
-          projectId={projectId}
-          passedTests={passed}
-          certificates={await listProjectCertificates(projectId)}
-        />
+        <div className="space-y-4">
+          {hasAc ? (
+            <p className="text-[13px] text-muted">
+              This tab is for Plumbing certificates. AC Commissioning certificates and F-Gas
+              records are under the{" "}
+              <Link href={`/admin/projects/${projectId}?tab=ac`} className="font-medium text-ink underline underline-offset-2">
+                AC Systems
+              </Link>{" "}
+              tab.
+            </p>
+          ) : null}
+          <CertificatesPanel
+            projectId={projectId}
+            passedTests={passed}
+            certificates={await listProjectCertificates(projectId)}
+          />
+        </div>
       ) : null}
 
       {tab === "ac" && hasAc ? (

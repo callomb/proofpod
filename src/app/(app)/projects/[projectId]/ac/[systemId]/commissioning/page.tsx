@@ -29,7 +29,9 @@ export default async function AcCommissioningPage(
       </div>
       <h1 className="mb-5 text-[24px] font-semibold tracking-tight">Commissioning</h1>
       <CommissioningPanel
+        projectId={projectId}
         acSystemId={systemId}
+        systemRef={system.system_ref}
         commissioning={commissioning}
         indoorUnits={indoorUnits(units)}
         temperatureReadings={temperatureReadings}

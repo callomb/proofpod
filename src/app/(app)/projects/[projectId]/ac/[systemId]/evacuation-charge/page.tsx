@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { EvacuationChargePanel } from "@/components/ac/evacuation-charge-panel";
-import { BackLink } from "@/components/ui";
+import { BackLink, LinkButton } from "@/components/ui";
 import {
   getAcCharge,
   getAcEvacuation,
@@ -45,6 +45,9 @@ export default async function AcEvacuationChargePage(
         rates={rates}
         hasFinalPhoto={hasFinalPhoto}
       />
+      <LinkButton href={`/projects/${projectId}/ac/${systemId}`} size="lg" className="mt-6 w-full">
+        Done — back to {system.system_ref}
+      </LinkButton>
     </div>
   );
 }
