@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "../supabase/server";
 import { createAdminClient } from "../supabase/admin";
+import type { ProjectOverview } from "../types";
 import type {
   AcAuditEvent,
   AcCertificate,
@@ -19,6 +20,82 @@ import type {
   AcTemperatureReading,
   AcUnit,
 } from "./types";
+
+export interface AcProjectCounts {
+  total: number;
+  inProgress: number;
+  passed: number;
+  failed: number;
+}
+
+/**
+ * AC systems + standalone pressure tests per project, for a company, in one
+ * pass — used to fold AC work into the plumbing-only project-card counts on
+ * the home page so a project with only AC work doesn't read as "No tests yet".
+ * "passed" folds in complete systems; "failed" only ever comes from a failed
+ * standalone test (an AC system itself has no failed state, only void).
+ */
+export async function getCompanyAcCounts(companyId: string): Promise<Map<string, AcProjectCounts>> {
+  const supabase = await createClient();
+  const [{ data: systemRows }, { data: testRows }] = await Promise.all([
+    supabase.from("ac_systems").select("project_id, status").eq("company_id", companyId),
+    supabase
+      .from("ac_pressure_tests")
+      .select("project_id, status, lineage_id, attempt_no")
+      .eq("company_id", companyId)
+      .is("ac_system_id", null)
+      .order("attempt_no", { ascending: false }),
+  ]);
+
+  const counts = new Map<string, AcProjectCounts>();
+  const bump = (projectId: string, field: keyof AcProjectCounts) => {
+    const c = counts.get(projectId) ?? { total: 0, inProgress: 0, passed: 0, failed: 0 };
+    c.total += 1;
+    if (field !== "total") c[field] += 1;
+    counts.set(projectId, c);
+  };
+
+  for (const row of (systemRows ?? []) as { project_id: string; status: AcSystem["status"] }[]) {
+    if (row.status === "in_progress") bump(row.project_id, "inProgress");
+    else if (row.status === "complete") bump(row.project_id, "passed");
+    else bump(row.project_id, "total");
+  }
+
+  // Dedupe standalone attempts to the latest per lineage (a retest is the
+  // same logical test, not a second one) — same rule as the project page.
+  const seenLineages = new Set<string>();
+  for (const row of (testRows ?? []) as {
+    project_id: string;
+    status: AcPressureTest["status"];
+    lineage_id: string;
+  }[]) {
+    if (seenLineages.has(row.lineage_id)) continue;
+    seenLineages.add(row.lineage_id);
+    if (row.status === "in_progress") bump(row.project_id, "inProgress");
+    else if (row.status === "passed") bump(row.project_id, "passed");
+    else bump(row.project_id, "failed");
+  }
+
+  return counts;
+}
+
+/** Folds AC counts into a plumbing-only ProjectOverview list, so project cards reflect combined activity. */
+export function mergeAcCounts<T extends ProjectOverview>(
+  projects: T[],
+  acCounts: Map<string, AcProjectCounts>,
+): T[] {
+  return projects.map((p) => {
+    const ac = acCounts.get(p.id);
+    if (!ac) return p;
+    return {
+      ...p,
+      tests_total: p.tests_total + ac.total,
+      tests_in_progress: p.tests_in_progress + ac.inProgress,
+      tests_passed: p.tests_passed + ac.passed,
+      tests_failed: p.tests_failed + ac.failed,
+    };
+  });
+}
 
 export async function listProjectAcSystems(projectId: string): Promise<AcSystem[]> {
   const supabase = await createClient();
