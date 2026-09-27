@@ -13,16 +13,28 @@ A Next.js 16 + Supabase web app. Mobile-first. ~15 minutes to a running beta.
 
 ## 2. Run the database schema
 
-In the Supabase dashboard → **SQL Editor** → **New query**. Run each file in order
-(paste the whole file, Run, then New query for the next):
+**Preferred: the Supabase CLI.** It's already a project dependency (`npx supabase`),
+so no separate install needed.
 
-1. [`supabase/migrations/0001_initial_schema.sql`](supabase/migrations/0001_initial_schema.sql)
-2. [`supabase/migrations/0002_storage.sql`](supabase/migrations/0002_storage.sql)
-3. [`supabase/migrations/0003_admin_certificates.sql`](supabase/migrations/0003_admin_certificates.sql)
-4. [`supabase/migrations/0004_fix_role_cast.sql`](supabase/migrations/0004_fix_role_cast.sql)
+1. Generate a personal access token at
+   [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
+   — scope it to this one **Project**, with **Database** access (Migrations at
+   least Read-write). No expiration needed.
+2. Add it to `.env.local` as `SUPABASE_ACCESS_TOKEN` (see `.env.example`).
+3. Link and push:
+   ```bash
+   npx supabase link --project-ref YOUR-PROJECT-ref
+   npx supabase db push
+   ```
+   This applies every file in `supabase/migrations/` in order, and tracks what's
+   already applied so re-running it later only pushes new ones.
 
-You should now have tables under **Table Editor** and three buckets
-(`evidence`, `branding`, `certificates`) under **Storage**.
+**Fallback: the SQL Editor.** Dashboard → **SQL Editor** → **New query**, paste
+one migration file, Run, then New query for the next — in order, starting from
+`0001_initial_schema.sql`. Only needed if you can't use the CLI for some reason.
+
+Either way, you should end up with tables under **Table Editor** and three
+buckets (`evidence`, `branding`, `certificates`) under **Storage**.
 
 ## 3. Turn off email confirmation (for the beta)
 
