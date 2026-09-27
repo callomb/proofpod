@@ -12,6 +12,27 @@ const ROUTE: Partial<Record<AcSystemType, string>> = {
   split: "split",
 };
 
+function Tile({ href, label, hint }: { href: string | null; label: string; hint?: string }) {
+  const card = (
+    <Card
+      className={`flex items-center justify-between p-4 ${
+        href ? "active:bg-canvas hover:bg-canvas" : "opacity-50"
+      }`}
+    >
+      <div>
+        <p className="text-[15px] font-semibold">{label}</p>
+        {hint ? <p className="mt-0.5 text-[13px] text-muted">{hint}</p> : null}
+      </div>
+      {!href ? (
+        <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
+          Coming soon
+        </span>
+      ) : null}
+    </Card>
+  );
+  return href ? <Link href={href}>{card}</Link> : <div>{card}</div>;
+}
+
 export default async function NewAcSystemTypePage(
   props: PageProps<"/projects/[projectId]/ac/new">,
 ) {
@@ -24,34 +45,29 @@ export default async function NewAcSystemTypePage(
       <div className="mb-3">
         <BackLink href={`/projects/${projectId}`}>{project.name}</BackLink>
       </div>
-      <h1 className="mb-6 text-[24px] font-semibold tracking-tight">New AC system</h1>
+      <h1 className="mb-6 text-[24px] font-semibold tracking-tight">New AC system or test</h1>
 
-      <div className="space-y-2.5">
+      <p className="mb-2.5 text-[13px] font-medium text-ink-soft">Systems</p>
+      <div className="mb-6 space-y-2.5">
         {(Object.keys(AC_SYSTEM_TYPE_META) as AcSystemType[]).map((type) => {
           const meta = AC_SYSTEM_TYPE_META[type];
-          const href = meta.available ? `/projects/${projectId}/ac/new/${ROUTE[type]}` : null;
-          const tile = (
-            <Card
-              className={`flex items-center justify-between p-4 ${
-                href ? "active:bg-canvas hover:bg-canvas" : "opacity-50"
-              }`}
-            >
-              <p className="text-[15px] font-semibold">{meta.label}</p>
-              {!href ? (
-                <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
-                  Coming soon
-                </span>
-              ) : null}
-            </Card>
-          );
-          return href ? (
-            <Link key={type} href={href}>
-              {tile}
-            </Link>
-          ) : (
-            <div key={type}>{tile}</div>
+          return (
+            <Tile
+              key={type}
+              label={meta.label}
+              href={meta.available ? `/projects/${projectId}/ac/new/${ROUTE[type]}` : null}
+            />
           );
         })}
+      </div>
+
+      <p className="mb-2.5 text-[13px] font-medium text-ink-soft">Standalone tests</p>
+      <div className="space-y-2.5">
+        <Tile
+          label="Pressure Test"
+          hint="Just a leak test — no full system record needed"
+          href={`/projects/${projectId}/ac/pressure-tests/new`}
+        />
       </div>
     </div>
   );

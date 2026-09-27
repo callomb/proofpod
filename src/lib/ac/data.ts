@@ -62,6 +62,47 @@ export async function listAcPressureTests(acSystemId: string): Promise<AcPressur
   return (data ?? []) as AcPressureTest[];
 }
 
+/** All attempts sharing one lineage (an original attempt + its retests). */
+export async function listAcPressureTestsByLineage(lineageId: string): Promise<AcPressureTest[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ac_pressure_tests")
+    .select("*")
+    .eq("lineage_id", lineageId)
+    .order("attempt_no", { ascending: false });
+  return (data ?? []) as AcPressureTest[];
+}
+
+export async function getAcPressureTest(id: string): Promise<AcPressureTest | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ac_pressure_tests")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle<AcPressureTest>();
+  return data;
+}
+
+/** One row per standalone (no-system) pressure test lineage on a project — the latest attempt in each. */
+export async function listStandaloneAcPressureTests(projectId: string): Promise<AcPressureTest[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ac_pressure_tests")
+    .select("*")
+    .eq("project_id", projectId)
+    .is("ac_system_id", null)
+    .order("attempt_no", { ascending: false });
+  const rows = (data ?? []) as AcPressureTest[];
+  const seen = new Set<string>();
+  const latestPerLineage: AcPressureTest[] = [];
+  for (const row of rows) {
+    if (seen.has(row.lineage_id)) continue;
+    seen.add(row.lineage_id);
+    latestPerLineage.push(row);
+  }
+  return latestPerLineage;
+}
+
 export async function getAcEvacuation(acSystemId: string): Promise<AcEvacuation | null> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -124,6 +165,13 @@ export async function listAcDrainTests(acSystemId: string): Promise<AcDrainTest[
     .eq("ac_system_id", acSystemId)
     .order("tested_at", { ascending: false });
   return (data ?? []) as AcDrainTest[];
+}
+
+export async function listAcPhotosForPressureTests(pressureTestIds: string[]): Promise<AcPhoto[]> {
+  if (pressureTestIds.length === 0) return [];
+  const supabase = await createClient();
+  const { data } = await supabase.from("ac_photos").select("*").in("ac_pressure_test_id", pressureTestIds);
+  return (data ?? []) as AcPhoto[];
 }
 
 export async function listAcPhotos(acSystemId: string): Promise<AcPhoto[]> {

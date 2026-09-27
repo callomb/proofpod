@@ -16,11 +16,11 @@ import { Button, Card, FormError, Muted, StatusDot, inputClass } from "../ui";
 
 async function uploadEvidence(
   file: File,
-  opts: { companyId: string; projectId: string; acSystemId: string },
+  opts: { companyId: string; projectId: string; folderId: string },
 ): Promise<string> {
   const supabase = createClient();
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const path = `${opts.companyId}/${opts.projectId}/${opts.acSystemId}/${crypto.randomUUID()}.${ext || "jpg"}`;
+  const path = `${opts.companyId}/${opts.projectId}/${opts.folderId}/${crypto.randomUUID()}.${ext || "jpg"}`;
   const { error } = await supabase.storage
     .from("evidence")
     .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
@@ -49,6 +49,7 @@ function PhotoThumb({ url, label }: { url: string | null; label: string }) {
 
 export function PressureTestPanel({
   acSystemId,
+  folderId,
   companyId,
   projectId,
   attempts,
@@ -56,7 +57,12 @@ export function PressureTestPanel({
   photoUrls,
   memberNames,
 }: {
-  acSystemId: string;
+  /** Null for a standalone pressure test (no System) — the panel is only ever
+   *  shown once the first attempt already exists (created on its own small
+   *  form), so this only affects the retest path here. */
+  acSystemId: string | null;
+  /** Storage-path grouping id — the system id, or the lineage id for standalone. */
+  folderId: string;
   companyId: string;
   projectId: string;
   attempts: AcPressureTest[];
@@ -94,10 +100,11 @@ export function PressureTestPanel({
     }
     setBusy(true);
     setError(null);
-    const res = await createAcPressureTestAttemptAction(
+    const res = await createAcPressureTestAttemptAction({
       acSystemId,
-      current?.status === "failed" ? current.id : null,
-    );
+      projectId: acSystemId ? undefined : projectId,
+      retestOf: current?.status === "failed" ? current.id : null,
+    });
     setBusy(false);
     if (res.error || !res.id) {
       setError(res.error ?? "Couldn't start a new attempt.");
@@ -114,9 +121,10 @@ export function PressureTestPanel({
     setBusy(true);
     setError(null);
     try {
-      const path = await uploadEvidence(file, { companyId, projectId, acSystemId });
+      const path = await uploadEvidence(file, { companyId, projectId, folderId });
       const rec = await recordAcPhotoAction({
         acSystemId,
+        projectId: acSystemId ? undefined : projectId,
         acPressureTestId: job.attemptId,
         storagePath: path,
         subject: job.kind === "start" ? "pressure_start" : "pressure_end",

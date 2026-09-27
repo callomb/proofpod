@@ -29,6 +29,7 @@ export default async function AcPressureTestPage(
       <h1 className="mb-5 text-[24px] font-semibold tracking-tight">Pressure Test</h1>
       <PressureTestPanel
         acSystemId={systemId}
+        folderId={systemId}
         companyId={system.company_id}
         projectId={projectId}
         attempts={attempts}

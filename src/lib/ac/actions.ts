@@ -148,22 +148,28 @@ export async function extractDataPlateAction(
 // ===========================================================================
 export interface AttemptResult extends ActionResult {
   id?: string;
+  lineageId?: string;
 }
 
-export async function createAcPressureTestAttemptAction(
-  acSystemId: string,
-  retestOf?: string | null,
-): Promise<AttemptResult> {
+export async function createAcPressureTestAttemptAction(input: {
+  acSystemId?: string | null;
+  projectId?: string | null;
+  reference?: string | null;
+  retestOf?: string | null;
+}): Promise<AttemptResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .rpc("create_ac_pressure_test_attempt", {
-      p_ac_system_id: acSystemId,
-      p_retest_of: retestOf ?? null,
+      p_ac_system_id: input.acSystemId ?? null,
+      p_project_id: input.projectId ?? null,
+      p_reference: input.reference ?? null,
+      p_retest_of: input.retestOf ?? null,
     })
     .select()
     .single();
   if (error) return { error: error.message };
-  return { ok: true, id: (data as { id: string }).id };
+  const row = data as { id: string; lineage_id: string };
+  return { ok: true, id: row.id, lineageId: row.lineage_id };
 }
 
 export async function startAcPressureTestAttemptAction(input: {
@@ -391,9 +397,10 @@ export async function completeAcSystemAction(acSystemId: string): Promise<Action
 // Evidence photos
 // ===========================================================================
 export async function recordAcPhotoAction(input: {
-  acSystemId: string;
   storagePath: string;
   subject: AcPhotoSubject;
+  acSystemId?: string | null;
+  projectId?: string | null;
   acUnitId?: string | null;
   acPressureTestId?: string | null;
   mime?: string | null;
@@ -401,9 +408,10 @@ export async function recordAcPhotoAction(input: {
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("record_ac_photo", {
-    p_ac_system_id: input.acSystemId,
     p_subject: input.subject,
     p_storage_path: input.storagePath,
+    p_ac_system_id: input.acSystemId ?? null,
+    p_project_id: input.projectId ?? null,
     p_ac_unit_id: input.acUnitId ?? null,
     p_ac_pressure_test_id: input.acPressureTestId ?? null,
     p_mime: input.mime ?? null,

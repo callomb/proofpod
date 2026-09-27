@@ -82,7 +82,11 @@ export type AcPressureTestStatus = "in_progress" | "passed" | "failed";
 export interface AcPressureTest {
   id: string;
   company_id: string;
-  ac_system_id: string;
+  ac_system_id: string | null;
+  project_id: string;
+  reference: string | null;
+  ref: string;
+  lineage_id: string;
   attempt_no: number;
   retest_of: string | null;
   status: AcPressureTestStatus;

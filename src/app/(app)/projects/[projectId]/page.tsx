@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AcSystemRow } from "@/components/ac/ac-system-row";
+import { StandaloneAcPressureTestRow } from "@/components/ac/standalone-pressure-test-row";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { TestRow } from "@/components/test-row";
 import { BackLink, LinkButton } from "@/components/ui";
-import { listProjectAcSystems } from "@/lib/ac/data";
+import { listProjectAcSystems, listStandaloneAcPressureTests } from "@/lib/ac/data";
 import { getProject, getWorkspace, listProjectTests } from "@/lib/data";
 import type { ModuleKey } from "@/lib/data";
-import type { AcSystem } from "@/lib/ac/types";
+import type { AcPressureTest, AcSystem } from "@/lib/ac/types";
 import type { PressureTest } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -67,37 +68,64 @@ function PlumbingSection({ tests, projectId }: { tests: PressureTest[]; projectI
   );
 }
 
-function AcSection({ systems, projectId }: { systems: AcSystem[]; projectId: string }) {
+function AcSection({
+  systems,
+  standaloneTests,
+  projectId,
+}: {
+  systems: AcSystem[];
+  standaloneTests: AcPressureTest[];
+  projectId: string;
+}) {
   const by = (s: AcSystem["status"]) => systems.filter((sys) => sys.status === s);
   const inProgress = by("in_progress");
   const complete = by("complete");
   const voided = by("void");
 
+  const byTest = (s: AcPressureTest["status"]) => standaloneTests.filter((t) => t.status === s);
+  const testsInProgress = byTest("in_progress");
+  const testsResolved = standaloneTests.filter((t) => t.status === "passed" || t.status === "failed");
+
   return (
     <div>
       <LinkButton href={`/projects/${projectId}/ac/new`} size="lg" className="mb-6 w-full">
         {PlusIcon}
-        New system
+        New
       </LinkButton>
 
-      <CollapsibleSection title="In progress" count={inProgress.length} defaultOpen>
+      <CollapsibleSection title="Systems — in progress" count={inProgress.length} defaultOpen>
         {inProgress.map((s) => (
           <AcSystemRow key={s.id} system={s} projectId={projectId} />
         ))}
       </CollapsibleSection>
 
-      <CollapsibleSection title="Complete" count={complete.length}>
+      <CollapsibleSection title="Systems — complete" count={complete.length}>
         {complete.map((s) => (
           <AcSystemRow key={s.id} system={s} projectId={projectId} />
         ))}
       </CollapsibleSection>
 
       {voided.length > 0 ? (
-        <CollapsibleSection title="Void" count={voided.length}>
+        <CollapsibleSection title="Systems — void" count={voided.length}>
           {voided.map((s) => (
             <AcSystemRow key={s.id} system={s} projectId={projectId} />
           ))}
         </CollapsibleSection>
+      ) : null}
+
+      {standaloneTests.length > 0 ? (
+        <>
+          <CollapsibleSection title="Pressure tests — in progress" count={testsInProgress.length}>
+            {testsInProgress.map((t) => (
+              <StandaloneAcPressureTestRow key={t.lineage_id} test={t} projectId={projectId} />
+            ))}
+          </CollapsibleSection>
+          <CollapsibleSection title="Pressure tests — resolved" count={testsResolved.length}>
+            {testsResolved.map((t) => (
+              <StandaloneAcPressureTestRow key={t.lineage_id} test={t} projectId={projectId} />
+            ))}
+          </CollapsibleSection>
+        </>
       ) : null}
     </div>
   );
@@ -150,7 +178,11 @@ export default async function ProjectPage(props: PageProps<"/projects/[projectId
       ) : null}
 
       {activeModule === "ac_commissioning" ? (
-        <AcSection systems={await listProjectAcSystems(projectId)} projectId={projectId} />
+        <AcSection
+          systems={await listProjectAcSystems(projectId)}
+          standaloneTests={await listStandaloneAcPressureTests(projectId)}
+          projectId={projectId}
+        />
       ) : (
         <PlumbingSection tests={await listProjectTests(projectId)} projectId={projectId} />
       )}
