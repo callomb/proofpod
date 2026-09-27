@@ -4,12 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { issueAcCertificateAction, setAcProjectSettingsAction } from "@/lib/ac/certificate-actions";
-import { AC_SYSTEM_STATUS_META } from "@/lib/ac/domain";
+import { AC_SYSTEM_STATUS_META, AC_SYSTEM_TYPE_META } from "@/lib/ac/domain";
 import type { AcCertificate, AcDocType, AcProjectSettings, AcSystem } from "@/lib/ac/types";
-import { Button, Card, Field, FormError, StatusDot, inputClass } from "@/components/ui";
+import { Button, Card, Field, FormError, StatusDot, buttonClass, inputClass } from "@/components/ui";
 
-const DOC_LABELS: { key: AcDocType; label: string }[] = [
-  { key: "full", label: "Full Certificate — everything in one document" },
+const INDIVIDUAL_DOC_LABELS: { key: AcDocType; label: string }[] = [
   { key: "pressure_test", label: "Pressure Test Certificate" },
   { key: "commissioning", label: "Commissioning Certificate" },
   { key: "drain_test", label: "Drain Test Certificate" },
@@ -19,6 +18,21 @@ const DOC_LABELS: { key: AcDocType; label: string }[] = [
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={`shrink-0 text-faint transition-transform ${open ? "rotate-180" : ""}`}
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function SystemCertificates({
@@ -34,7 +48,9 @@ function SystemCertificates({
   const [pending, start] = useTransition();
   const [busyDoc, setBusyDoc] = useState<AcDocType | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const statusMeta = AC_SYSTEM_STATUS_META[system.status];
+  const isReady = system.status === "complete";
 
   const latestFor = (docType: AcDocType) =>
     certificates.filter((c) => c.doc_type === docType).sort((a, b) => b.issued_at.localeCompare(a.issued_at))[0];
@@ -53,50 +69,101 @@ function SystemCertificates({
     });
   };
 
+  const fullCert = latestFor("full");
+
   return (
     <Card className="p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-[14px] font-semibold">{system.system_ref}</p>
-        <span className="inline-flex items-center gap-1.5 text-[12px] font-medium">
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[15px] font-semibold">{system.system_ref}</p>
+          <p className="truncate text-[12px] text-muted">
+            {AC_SYSTEM_TYPE_META[system.system_type]?.label ?? "AC system"}
+            {system.area_served ? ` · ${system.area_served}` : ""}
+          </p>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-medium">
           <StatusDot tone={statusMeta.tone} />
           {statusMeta.label}
         </span>
       </div>
 
-      <div className="space-y-2">
-        {DOC_LABELS.map(({ key, label }) => {
-          const cert = latestFor(key);
-          return (
-            <div key={key} className="flex items-center justify-between gap-3 rounded-xl bg-canvas px-3 py-2.5">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium">{label}</p>
+      {fullCert ? (
+        <p className="mb-3 text-[12px] text-muted">
+          Certificate {fullCert.number} · Issued {fmtDate(fullCert.issued_at)}
+        </p>
+      ) : (
+        <div className="mb-3" />
+      )}
+
+      {isReady ? (
+        fullCert ? (
+          <a
+            href={`/admin/projects/${projectId}/ac/certificates/${fullCert.id}`}
+            className={buttonClass("primary", "md", "w-full")}
+          >
+            Download Full System Certificate
+          </a>
+        ) : (
+          <Button
+            className="w-full"
+            disabled={pending && busyDoc === "full"}
+            onClick={() => issue("full")}
+          >
+            {pending && busyDoc === "full" ? "Issuing…" : "Issue Full System Certificate"}
+          </Button>
+        )
+      ) : (
+        <div className="flex h-11 items-center justify-center rounded-full bg-canvas text-[13px] font-medium text-faint">
+          Not ready — complete commissioning first
+        </div>
+      )}
+
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="mt-3 flex w-full items-center justify-between py-1.5 text-[13px] font-medium text-muted hover:text-ink"
+      >
+        Individual Certificates
+        <ChevronIcon open={expanded} />
+      </button>
+
+      {expanded ? (
+        <div className="mt-1 space-y-2">
+          {INDIVIDUAL_DOC_LABELS.map(({ key, label }) => {
+            const cert = latestFor(key);
+            return (
+              <div key={key} className="flex items-center justify-between gap-3 rounded-xl bg-canvas px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium">{label}</p>
+                  {cert ? (
+                    <p className="text-[12px] text-muted">
+                      {cert.number} · issued {fmtDate(cert.issued_at)}
+                    </p>
+                  ) : null}
+                </div>
                 {cert ? (
-                  <p className="text-[12px] text-muted">
-                    {cert.number} · issued {fmtDate(cert.issued_at)}
-                  </p>
-                ) : null}
+                  <a
+                    href={`/admin/projects/${projectId}/ac/certificates/${cert.id}`}
+                    className="shrink-0 rounded-full border border-line-strong px-3.5 py-1.5 text-[12px] font-semibold hover:bg-paper"
+                  >
+                    Download
+                  </a>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={pending && busyDoc === key}
+                    onClick={() => issue(key)}
+                  >
+                    {pending && busyDoc === key ? "Issuing…" : "Issue"}
+                  </Button>
+                )}
               </div>
-              {cert ? (
-                <a
-                  href={`/admin/projects/${projectId}/ac/certificates/${cert.id}`}
-                  className="shrink-0 rounded-full border border-line-strong px-3.5 py-1.5 text-[12px] font-semibold hover:bg-paper"
-                >
-                  Download
-                </a>
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={pending && busyDoc === key}
-                  onClick={() => issue(key)}
-                >
-                  {pending && busyDoc === key ? "Issuing…" : "Issue"}
-                </Button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : null}
+
       {error ? (
         <div className="mt-3">
           <FormError>{error}</FormError>

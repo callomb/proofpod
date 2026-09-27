@@ -261,6 +261,7 @@ export interface AcCertificateSnapshot {
     gwp: number;
   };
   units: {
+    id?: string;
     unit_role: AcUnitRole;
     reference: string | null;
     location: string | null;
@@ -280,13 +281,13 @@ export interface AcCertificateSnapshot {
       status: AcPressureStageStatus;
       started_at: string | null;
       completed_at: string | null;
-      photos: { subject: string; storage_path: string; taken_at: string }[] | null;
+      photos: { subject: string; storage_path: string; taken_at: string; taken_by_name?: string | null }[] | null;
     }[];
   } | null;
   evacuation: {
     checklist: Record<string, boolean>;
     completed_at: string | null;
-    photo: { storage_path: string; taken_at: string } | null;
+    photo: { storage_path: string; taken_at: string; taken_by_name?: string | null } | null;
   } | null;
   charge: {
     factory_charge_kg: number | null;
@@ -327,6 +328,7 @@ export interface AcCertificateSnapshot {
     tested_at: string;
   }[];
   completed_at: string | null;
+  completed_by_name?: string | null;
   issued_at: string;
 }
 
