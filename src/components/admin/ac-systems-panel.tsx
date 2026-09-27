@@ -9,6 +9,7 @@ import type { AcCertificate, AcDocType, AcProjectSettings, AcSystem } from "@/li
 import { Button, Card, Field, FormError, StatusDot, inputClass } from "@/components/ui";
 
 const DOC_LABELS: { key: AcDocType; label: string }[] = [
+  { key: "full", label: "Full Certificate — everything in one document" },
   { key: "pressure_test", label: "Pressure Test Certificate" },
   { key: "commissioning", label: "Commissioning Certificate" },
   { key: "drain_test", label: "Drain Test Certificate" },

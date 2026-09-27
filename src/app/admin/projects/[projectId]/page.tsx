@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { TestRow } from "@/components/test-row";
+import { AcSystemRow } from "@/components/ac/ac-system-row";
+import { StandaloneAcPressureTestRow } from "@/components/ac/standalone-pressure-test-row";
 import { CertificatesPanel } from "@/components/admin/certificates-panel";
 import { AcSystemsPanel } from "@/components/admin/ac-systems-panel";
 import {
@@ -16,13 +18,81 @@ import {
   listProjectCertificates,
   listProjectTests,
 } from "@/lib/data";
-import { getAcProjectSettings, listProjectAcCertificates, listProjectAcSystems } from "@/lib/ac/data";
+import {
+  getAcProjectSettings,
+  listProjectAcCertificates,
+  listProjectAcSystems,
+  listStandaloneAcPressureTests,
+} from "@/lib/ac/data";
 import { createClient } from "@/lib/supabase/server";
 import type { PressureTest, TestProfile } from "@/lib/types";
+import type { AcPressureTest, AcSystem } from "@/lib/ac/types";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "tests" | "details" | "certificates" | "ac";
+type Tab = "tests" | "details" | "certificates";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "tests", label: "Tests" },
+  { key: "details", label: "Project details" },
+  { key: "certificates", label: "Certificates" },
+];
+
+function AcOverviewSection({
+  projectId,
+  systems,
+  standaloneTests,
+}: {
+  projectId: string;
+  systems: AcSystem[];
+  standaloneTests: AcPressureTest[];
+}) {
+  const by = (s: AcSystem["status"]) => systems.filter((sys) => sys.status === s);
+  const testBy = (s: AcPressureTest["status"]) => standaloneTests.filter((t) => t.status === s);
+
+  return (
+    <div className="mt-8">
+      <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
+        AC Commissioning
+      </h2>
+      <CollapsibleSection title="Systems — in progress" count={by("in_progress").length} defaultOpen>
+        {by("in_progress").map((s) => (
+          <AcSystemRow key={s.id} system={s} projectId={projectId} />
+        ))}
+      </CollapsibleSection>
+      <CollapsibleSection title="Systems — complete" count={by("complete").length}>
+        {by("complete").map((s) => (
+          <AcSystemRow key={s.id} system={s} projectId={projectId} />
+        ))}
+      </CollapsibleSection>
+      {by("void").length > 0 ? (
+        <CollapsibleSection title="Systems — void" count={by("void").length}>
+          {by("void").map((s) => (
+            <AcSystemRow key={s.id} system={s} projectId={projectId} />
+          ))}
+        </CollapsibleSection>
+      ) : null}
+      {standaloneTests.length > 0 ? (
+        <>
+          <CollapsibleSection title="Pressure tests — in progress" count={testBy("in_progress").length}>
+            {testBy("in_progress").map((t) => (
+              <StandaloneAcPressureTestRow key={t.lineage_id} test={t} projectId={projectId} />
+            ))}
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="Pressure tests — resolved"
+            count={standaloneTests.length - testBy("in_progress").length}
+          >
+            {standaloneTests
+              .filter((t) => t.status !== "in_progress")
+              .map((t) => (
+                <StandaloneAcPressureTestRow key={t.lineage_id} test={t} projectId={projectId} />
+              ))}
+          </CollapsibleSection>
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function AdminProjectPage(
   props: PageProps<"/admin/projects/[projectId]">,
@@ -37,14 +107,7 @@ export default async function AdminProjectPage(
   if (!project) notFound();
 
   const hasAc = modules.includes("ac_commissioning");
-  const TABS: { key: Tab; label: string }[] = [
-    { key: "tests", label: "Tests" },
-    { key: "details", label: "Project details" },
-    { key: "certificates", label: "Certificates" },
-    ...(hasAc ? [{ key: "ac" as const, label: "AC Systems" }] : []),
-  ];
-  const validTabs = TABS.map((t) => t.key);
-  const tab: Tab = validTabs.includes(sp.tab as Tab) ? (sp.tab as Tab) : "tests";
+  const tab: Tab = TABS.map((t) => t.key).includes(sp.tab as Tab) ? (sp.tab as Tab) : "tests";
 
   const tests = await listProjectTests(projectId);
   const by = (s: PressureTest["status"]) => tests.filter((t) => t.status === s);
@@ -52,6 +115,10 @@ export default async function AdminProjectPage(
   const passed = by("passed");
   const failed = by("failed");
   const voided = by("void");
+
+  const [acSystems, acStandaloneTests] = hasAc
+    ? await Promise.all([listProjectAcSystems(projectId), listStandaloneAcPressureTests(projectId)])
+    : [[], []];
 
   return (
     <div>
@@ -111,6 +178,10 @@ export default async function AdminProjectPage(
               <TestRow key={t.id} test={t} basePath="/admin/projects" />
             ))}
           </CollapsibleSection>
+
+          {hasAc ? (
+            <AcOverviewSection projectId={projectId} systems={acSystems} standaloneTests={acStandaloneTests} />
+          ) : null}
         </div>
       ) : null}
 
@@ -119,32 +190,32 @@ export default async function AdminProjectPage(
       ) : null}
 
       {tab === "certificates" ? (
-        <div className="space-y-4">
-          {hasAc ? (
-            <p className="text-[13px] text-muted">
-              This tab is for Plumbing certificates. AC Commissioning certificates and F-Gas
-              records are under the{" "}
-              <Link href={`/admin/projects/${projectId}?tab=ac`} className="font-medium text-ink underline underline-offset-2">
-                AC Systems
-              </Link>{" "}
-              tab.
-            </p>
-          ) : null}
-          <CertificatesPanel
-            projectId={projectId}
-            passedTests={passed}
-            certificates={await listProjectCertificates(projectId)}
-          />
-        </div>
-      ) : null}
+        <div className="space-y-8">
+          <section>
+            <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
+              Plumbing
+            </h2>
+            <CertificatesPanel
+              projectId={projectId}
+              passedTests={passed}
+              certificates={await listProjectCertificates(projectId)}
+            />
+          </section>
 
-      {tab === "ac" && hasAc ? (
-        <AcSystemsPanel
-          projectId={projectId}
-          systems={await listProjectAcSystems(projectId)}
-          certificates={await listProjectAcCertificates(projectId)}
-          projectSettings={await getAcProjectSettings(projectId)}
-        />
+          {hasAc ? (
+            <section>
+              <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
+                AC Commissioning
+              </h2>
+              <AcSystemsPanel
+                projectId={projectId}
+                systems={acSystems}
+                certificates={await listProjectAcCertificates(projectId)}
+                projectSettings={await getAcProjectSettings(projectId)}
+              />
+            </section>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

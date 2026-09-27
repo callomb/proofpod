@@ -224,7 +224,13 @@ export interface AcProjectSettings {
   updated_at: string;
 }
 
-export type AcDocType = "pressure_test" | "commissioning" | "drain_test" | "fgas_log" | "fgas_inventory";
+export type AcDocType =
+  | "pressure_test"
+  | "commissioning"
+  | "drain_test"
+  | "fgas_log"
+  | "fgas_inventory"
+  | "full";
 
 export interface AcCertificateSnapshot {
   company: {

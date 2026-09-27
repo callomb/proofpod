@@ -12,6 +12,7 @@ const DOC_TITLE: Record<AcDocType, string> = {
   drain_test: "Drain Test Certificate",
   fgas_log: "F-Gas Record — Log Sheet",
   fgas_inventory: "F-Gas Record — Inventory Entry",
+  full: "Full Commissioning Certificate",
 };
 
 const ink = "#111111";
@@ -253,8 +254,11 @@ function AcCertificateDoc({
   images: Images;
   logo?: EmbeddedImage;
 }) {
+  const includesPressureTest = docType === "pressure_test" || docType === "full";
+  const includesCommissioning = docType === "commissioning" || docType === "full";
+
   const photoPaths: { path: string; label: string }[] = [];
-  if (docType === "pressure_test" && snapshot.pressure_test) {
+  if (includesPressureTest && snapshot.pressure_test) {
     for (const stage of snapshot.pressure_test.stages) {
       for (const p of stage.photos ?? []) {
         photoPaths.push({
@@ -264,13 +268,13 @@ function AcCertificateDoc({
       }
     }
   }
-  if (docType === "commissioning" && snapshot.evacuation?.photo) {
+  if (includesCommissioning && snapshot.evacuation?.photo) {
     photoPaths.push({ path: snapshot.evacuation.photo.storage_path, label: "Evacuation" });
   }
 
   return (
     <Document>
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={s.page} wrap>
         <CompanyHeader snapshot={snapshot} logo={logo} />
         <Text style={s.h1}>{DOC_TITLE[docType]}</Text>
         <Text style={s.intro}>
@@ -278,10 +282,12 @@ function AcCertificateDoc({
         </Text>
 
         <SystemSummary snapshot={snapshot} />
-        {docType === "pressure_test" ? <PressureTestBody snapshot={snapshot} /> : null}
-        {docType === "commissioning" ? <CommissioningBody snapshot={snapshot} /> : null}
-        {docType === "drain_test" ? <DrainTestBody snapshot={snapshot} /> : null}
-        {docType === "fgas_log" || docType === "fgas_inventory" ? <FGasBody snapshot={snapshot} /> : null}
+        {includesPressureTest ? <PressureTestBody snapshot={snapshot} /> : null}
+        {includesCommissioning ? <CommissioningBody snapshot={snapshot} /> : null}
+        {docType === "drain_test" || docType === "full" ? <DrainTestBody snapshot={snapshot} /> : null}
+        {docType === "fgas_log" || docType === "fgas_inventory" || docType === "full" ? (
+          <FGasBody snapshot={snapshot} />
+        ) : null}
 
         {photoPaths.length > 0 ? (
           <>
@@ -332,12 +338,12 @@ export async function renderAcCertificatePdf(
   snapshot: AcCertificateSnapshot,
 ): Promise<Buffer> {
   const photoPaths: string[] = [];
-  if (docType === "pressure_test" && snapshot.pressure_test) {
+  if ((docType === "pressure_test" || docType === "full") && snapshot.pressure_test) {
     for (const stage of snapshot.pressure_test.stages) {
       photoPaths.push(...(stage.photos ?? []).map((p) => p.storage_path));
     }
   }
-  if (docType === "commissioning" && snapshot.evacuation?.photo) {
+  if ((docType === "commissioning" || docType === "full") && snapshot.evacuation?.photo) {
     photoPaths.push(snapshot.evacuation.photo.storage_path);
   }
   const images = await fetchPhotos(photoPaths);
