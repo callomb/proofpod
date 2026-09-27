@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 
 import { PressureTestPanel } from "@/components/ac/pressure-test-panel";
 import { BackLink } from "@/components/ui";
-import { getAcSystem, listAcPhotos, listAcPressureTests, signAcEvidenceUrls } from "@/lib/ac/data";
+import {
+  getAcSystem,
+  listAcPhotos,
+  listAcPressureTestStages,
+  listAcPressureTests,
+  signAcEvidenceUrls,
+} from "@/lib/ac/data";
 import { getWorkspace } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +24,7 @@ export default async function AcPressureTestPage(
     listAcPressureTests(systemId),
     listAcPhotos(systemId),
   ]);
+  const stages = await listAcPressureTestStages(attempts.map((a) => a.id));
   const photos = allPhotos.filter((p) => p.subject === "pressure_start" || p.subject === "pressure_end");
   const photoUrls = await signAcEvidenceUrls(photos.map((p) => p.storage_path));
 
@@ -33,6 +40,7 @@ export default async function AcPressureTestPage(
         companyId={system.company_id}
         projectId={projectId}
         attempts={attempts}
+        stages={stages}
         photos={photos}
         photoUrls={photoUrls}
         memberNames={memberNames}

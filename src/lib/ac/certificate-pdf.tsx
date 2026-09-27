@@ -134,13 +134,21 @@ function PressureTestBody({ snapshot }: { snapshot: AcCertificateSnapshot }) {
     <>
       <Text style={s.h2}>Pressure test — attempt {t.attempt_no}</Text>
       <View style={s.grid}>
-        <Field label="Starting pressure" value={num(t.start_pressure_bar, " bar")} />
-        <Field label="Pressure after test" value={num(t.end_pressure_bar, " bar")} />
-        <Field label="Duration" value={num(t.test_duration_min, " min")} />
-        <Field label="Started" value={fmtDateTime(t.started_at)} />
-        <Field label="Completed" value={fmtDateTime(t.completed_at)} />
         <Field label="Result" value={t.status === "passed" ? "PASS" : t.status.toUpperCase()} />
+        <Field label="Result recorded" value={fmtDateTime(t.result_at)} />
       </View>
+      {t.stages.map((stage) => (
+        <View key={stage.stage_no} style={s.grid}>
+          <Field
+            label={`Stage ${stage.stage_no} target`}
+            value={`${stage.target_pressure_bar} bar · ${
+              stage.target_duration_min === null ? "until evacuated" : num(stage.target_duration_min, " min")
+            }`}
+          />
+          <Field label={`Stage ${stage.stage_no} started`} value={fmtDateTime(stage.started_at)} />
+          <Field label={`Stage ${stage.stage_no} completed`} value={fmtDateTime(stage.completed_at)} />
+        </View>
+      ))}
     </>
   );
 }
@@ -247,8 +255,13 @@ function AcCertificateDoc({
 }) {
   const photoPaths: { path: string; label: string }[] = [];
   if (docType === "pressure_test" && snapshot.pressure_test) {
-    for (const p of snapshot.pressure_test.photos) {
-      photoPaths.push({ path: p.storage_path, label: p.subject === "pressure_start" ? "Start" : "End" });
+    for (const stage of snapshot.pressure_test.stages) {
+      for (const p of stage.photos ?? []) {
+        photoPaths.push({
+          path: p.storage_path,
+          label: `Stage ${stage.stage_no} ${p.subject === "pressure_start" ? "start" : "end"}`,
+        });
+      }
     }
   }
   if (docType === "commissioning" && snapshot.evacuation?.photo) {
@@ -320,7 +333,9 @@ export async function renderAcCertificatePdf(
 ): Promise<Buffer> {
   const photoPaths: string[] = [];
   if (docType === "pressure_test" && snapshot.pressure_test) {
-    photoPaths.push(...snapshot.pressure_test.photos.map((p) => p.storage_path));
+    for (const stage of snapshot.pressure_test.stages) {
+      photoPaths.push(...(stage.photos ?? []).map((p) => p.storage_path));
+    }
   }
   if (docType === "commissioning" && snapshot.evacuation?.photo) {
     photoPaths.push(snapshot.evacuation.photo.storage_path);

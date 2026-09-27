@@ -4,6 +4,7 @@ import { PressureTestPanel } from "@/components/ac/pressure-test-panel";
 import { BackLink } from "@/components/ui";
 import {
   listAcPhotosForPressureTests,
+  listAcPressureTestStages,
   listAcPressureTestsByLineage,
   signAcEvidenceUrls,
 } from "@/lib/ac/data";
@@ -21,7 +22,10 @@ export default async function StandaloneAcPressureTestPage(
   const attempts = await listAcPressureTestsByLineage(lineageId);
   if (attempts.length === 0 || attempts[0].project_id !== projectId) notFound();
 
-  const allPhotos = await listAcPhotosForPressureTests(attempts.map((a) => a.id));
+  const [allPhotos, stages] = await Promise.all([
+    listAcPhotosForPressureTests(attempts.map((a) => a.id)),
+    listAcPressureTestStages(attempts.map((a) => a.id)),
+  ]);
   const photos = allPhotos.filter((p) => p.subject === "pressure_start" || p.subject === "pressure_end");
   const photoUrls = await signAcEvidenceUrls(photos.map((p) => p.storage_path));
 
@@ -38,6 +42,7 @@ export default async function StandaloneAcPressureTestPage(
         companyId={project.company_id}
         projectId={projectId}
         attempts={attempts}
+        stages={stages}
         photos={photos}
         photoUrls={photoUrls}
         memberNames={memberNames}

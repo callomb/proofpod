@@ -172,35 +172,17 @@ export async function createAcPressureTestAttemptAction(input: {
   return { ok: true, id: row.id, lineageId: row.lineage_id };
 }
 
-export async function startAcPressureTestAttemptAction(input: {
-  attemptId: string;
-  startPressureBar: number;
-  notes?: string | null;
-}): Promise<ActionResult> {
+export async function startAcPressureTestStageAction(stageId: string): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("start_ac_pressure_test_attempt", {
-    p_attempt_id: input.attemptId,
-    p_start_pressure_bar: input.startPressureBar,
-    p_notes: input.notes ?? null,
-  });
+  const { error } = await supabase.rpc("start_ac_pressure_test_stage", { p_stage_id: stageId });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
-export async function completeAcPressureTestAttemptAction(input: {
-  attemptId: string;
-  endPressureBar: number;
-  testDurationMin: number;
-  notes?: string | null;
-}): Promise<ActionResult> {
+export async function completeAcPressureTestStageAction(stageId: string): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("complete_ac_pressure_test_attempt", {
-    p_attempt_id: input.attemptId,
-    p_end_pressure_bar: input.endPressureBar,
-    p_test_duration_min: input.testDurationMin,
-    p_notes: input.notes ?? null,
-  });
+  const { error } = await supabase.rpc("complete_ac_pressure_test_stage", { p_stage_id: stageId });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
@@ -403,6 +385,7 @@ export async function recordAcPhotoAction(input: {
   projectId?: string | null;
   acUnitId?: string | null;
   acPressureTestId?: string | null;
+  stageNo?: number | null;
   mime?: string | null;
   sizeBytes?: number | null;
 }): Promise<ActionResult> {
@@ -414,6 +397,7 @@ export async function recordAcPhotoAction(input: {
     p_project_id: input.projectId ?? null,
     p_ac_unit_id: input.acUnitId ?? null,
     p_ac_pressure_test_id: input.acPressureTestId ?? null,
+    p_stage_no: input.stageNo ?? null,
     p_mime: input.mime ?? null,
     p_size_bytes: input.sizeBytes ?? null,
   });

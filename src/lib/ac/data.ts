@@ -13,6 +13,7 @@ import type {
   AcEvacuation,
   AcPhoto,
   AcPressureTest,
+  AcPressureTestStage,
   AcProjectSettings,
   AcSystem,
   AcTemperatureReading,
@@ -71,6 +72,17 @@ export async function listAcPressureTestsByLineage(lineageId: string): Promise<A
     .eq("lineage_id", lineageId)
     .order("attempt_no", { ascending: false });
   return (data ?? []) as AcPressureTest[];
+}
+
+export async function listAcPressureTestStages(pressureTestIds: string[]): Promise<AcPressureTestStage[]> {
+  if (pressureTestIds.length === 0) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ac_pressure_test_stages")
+    .select("*")
+    .in("ac_pressure_test_id", pressureTestIds)
+    .order("stage_no", { ascending: true });
+  return (data ?? []) as AcPressureTestStage[];
 }
 
 export async function getAcPressureTest(id: string): Promise<AcPressureTest | null> {

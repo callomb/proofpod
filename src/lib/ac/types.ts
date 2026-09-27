@@ -65,9 +65,10 @@ export interface AcPhoto {
   id: string;
   company_id: string;
   project_id: string;
-  ac_system_id: string;
+  ac_system_id: string | null;
   ac_unit_id: string | null;
   ac_pressure_test_id: string | null;
+  stage_no: number | null;
   subject: AcPhotoSubject;
   storage_path: string;
   mime: string | null;
@@ -264,13 +265,17 @@ export interface AcCertificateSnapshot {
   pressure_test: {
     attempt_no: number;
     status: AcPressureTestStatus;
-    start_pressure_bar: number | null;
-    end_pressure_bar: number | null;
-    test_duration_min: number | null;
-    started_at: string | null;
-    completed_at: string | null;
     result_at: string | null;
-    photos: { subject: string; storage_path: string; taken_at: string }[];
+    stages: {
+      stage_no: number;
+      target_pressure_bar: number;
+      target_duration_min: number | null;
+      requires_photo: boolean;
+      status: AcPressureStageStatus;
+      started_at: string | null;
+      completed_at: string | null;
+      photos: { subject: string; storage_path: string; taken_at: string }[] | null;
+    }[];
   } | null;
   evacuation: {
     checklist: Record<string, boolean>;
@@ -331,6 +336,25 @@ export interface AcCertificate {
   issued_by: string | null;
   issued_at: string;
   created_at: string;
+}
+
+export type AcPressureStageStatus = "not_started" | "in_progress" | "complete";
+
+export interface AcPressureTestStage {
+  id: string;
+  company_id: string;
+  ac_pressure_test_id: string;
+  stage_no: number;
+  target_pressure_bar: number;
+  target_duration_min: number | null;
+  requires_photo: boolean;
+  status: AcPressureStageStatus;
+  started_at: string | null;
+  started_by: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AcAuditEvent {
