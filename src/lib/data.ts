@@ -19,6 +19,8 @@ import type {
   AuditEvent,
 } from "./types";
 
+export type ModuleKey = "plumbing" | "ac_commissioning";
+
 export interface Workspace {
   user: User;
   profile: Profile;
@@ -27,6 +29,9 @@ export interface Workspace {
   isAdmin: boolean;
   /** All members of the company, with their profiles, keyed for name lookups. */
   memberNames: Record<string, string>;
+  /** Modules enabled for this company. Always includes "plumbing" unless a
+   *  platform admin has explicitly disabled it. */
+  modules: ModuleKey[];
 }
 
 /** Current auth user or redirect to sign-in. */
@@ -90,7 +95,20 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
 
   const isAdmin = membership.role === "admin" || membership.role === "owner";
 
-  return { user, profile, company, membership, isAdmin, memberNames };
+  const { data: moduleRows } = await supabase
+    .from("company_modules")
+    .select("module, enabled")
+    .eq("company_id", company.id);
+  const moduleSet = new Set(
+    ((moduleRows ?? []) as { module: ModuleKey; enabled: boolean }[])
+      .filter((r) => r.enabled)
+      .map((r) => r.module),
+  );
+  // A missing row still means "on" for plumbing (mirrors company_has_module in SQL).
+  if (!moduleRows?.some((r) => r.module === "plumbing")) moduleSet.add("plumbing");
+  const modules = Array.from(moduleSet);
+
+  return { user, profile, company, membership, isAdmin, memberNames, modules };
 });
 
 /** Workspace, but redirect Site Users away from admin-only areas. */

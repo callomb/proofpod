@@ -6,14 +6,78 @@ import { useRouter } from "next/navigation";
 import {
   platformResetPasswordAction,
   platformSetMemberStatusAction,
+  platformSetModuleEnabledAction,
 } from "@/lib/platform-actions";
 import { initials } from "@/lib/domain";
 import { roleLabel } from "@/lib/types";
-import type { MemberWithProfile } from "@/lib/platform";
+import type { ModuleKey, MemberWithProfile } from "@/lib/platform";
 import { Button, Card, StatusDot } from "@/components/ui";
 import { Sheet } from "@/components/app-shell";
 import { ActivityLine, type ActivityView } from "@/components/activity-line";
 import { CredentialsPanel } from "./credentials-panel";
+
+const MODULE_META: Record<ModuleKey, { label: string; description: string }> = {
+  plumbing: {
+    label: "Plumbing pressure testing",
+    description: "Pressure tests, stages, evidence and certificates.",
+  },
+  ac_commissioning: {
+    label: "AC Commissioning",
+    description: "Split system commissioning, evidence and F-Gas records.",
+  },
+};
+
+function ModulesCard({
+  companyId,
+  modules,
+}: {
+  companyId: string;
+  modules: Record<ModuleKey, boolean>;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function toggle(module: ModuleKey, enabled: boolean) {
+    start(async () => {
+      const res = await platformSetModuleEnabledAction(companyId, module, enabled);
+      if (res.error) setError(res.error);
+      else router.refresh();
+    });
+  }
+
+  return (
+    <Card className="mb-4 p-4">
+      <p className="mb-3 text-[13px] font-medium text-ink-soft">Modules</p>
+      <div className="flex flex-col gap-3">
+        {(Object.keys(MODULE_META) as ModuleKey[]).map((key) => {
+          const enabled = modules[key];
+          const meta = MODULE_META[key];
+          return (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[14px] font-medium">
+                  <StatusDot tone={enabled ? "pass" : "void"} />
+                  {meta.label}
+                </div>
+                <p className="mt-0.5 text-[12px] text-muted">{meta.description}</p>
+              </div>
+              <Button
+                variant={enabled ? "danger" : "secondary"}
+                size="sm"
+                disabled={pending}
+                onClick={() => toggle(key, !enabled)}
+              >
+                {enabled ? "Disable" : "Enable"}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+      {error ? <p className="mt-2 text-[12px] text-fail">{error}</p> : null}
+    </Card>
+  );
+}
 
 function MemberCard({
   m,
@@ -116,6 +180,7 @@ export function CompanyDetail({
   companyName,
   members,
   projectCount,
+  modules,
   activity,
   trackingSince,
 }: {
@@ -123,6 +188,7 @@ export function CompanyDetail({
   companyName: string;
   members: MemberWithProfile[];
   projectCount: number;
+  modules: Record<ModuleKey, boolean>;
   activity: Record<string, ActivityView>;
   trackingSince: string;
 }) {
@@ -133,6 +199,7 @@ export function CompanyDetail({
         {members.length} user{members.length === 1 ? "" : "s"} · {projectCount} project
         {projectCount === 1 ? "" : "s"}
       </p>
+      <ModulesCard companyId={companyId} modules={modules} />
       <div className="grid gap-3 sm:grid-cols-2">
         {members.map((m) => (
           <MemberCard

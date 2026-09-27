@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 
 import { CompanyDetail } from "@/components/platform/company-detail";
 import { BackLink } from "@/components/ui";
-import { getCompanyForPlatform, listCompanyMembersForPlatform } from "@/lib/platform";
+import {
+  getCompanyForPlatform,
+  getCompanyModulesForPlatform,
+  listCompanyMembersForPlatform,
+} from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRACKING_SINCE, getMemberActivity } from "@/lib/activity";
 
@@ -13,13 +17,14 @@ export default async function PlatformCompanyPage(props: PageProps<"/platform/co
   const company = await getCompanyForPlatform(id);
   if (!company) notFound();
 
-  const [members, projectCount] = await Promise.all([
+  const [members, projectCount, modules] = await Promise.all([
     listCompanyMembersForPlatform(id),
     createAdminClient()
       .from("projects")
       .select("id", { count: "exact", head: true })
       .eq("company_id", id)
       .then(({ count }) => count ?? 0),
+    getCompanyModulesForPlatform(id),
   ]);
 
   const activity = await getMemberActivity(members.map((m) => m.membership.user_id));
@@ -34,6 +39,7 @@ export default async function PlatformCompanyPage(props: PageProps<"/platform/co
         companyName={company.name}
         members={members}
         projectCount={projectCount}
+        modules={modules}
         activity={activity}
         trackingSince={TRACKING_SINCE}
       />

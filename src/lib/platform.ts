@@ -69,6 +69,25 @@ export async function getCompanyForPlatform(companyId: string): Promise<Company 
   return data as Company | null;
 }
 
+export type ModuleKey = "plumbing" | "ac_commissioning";
+
+/** A company's module toggles, keyed by module. Missing rows read as their default. */
+export async function getCompanyModulesForPlatform(
+  companyId: string,
+): Promise<Record<ModuleKey, boolean>> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("company_modules")
+    .select("module, enabled")
+    .eq("company_id", companyId);
+  const rows = (data ?? []) as { module: ModuleKey; enabled: boolean }[];
+  const byModule = new Map(rows.map((r) => [r.module, r.enabled]));
+  return {
+    plumbing: byModule.get("plumbing") ?? true,
+    ac_commissioning: byModule.get("ac_commissioning") ?? false,
+  };
+}
+
 export interface MemberWithProfile {
   membership: CompanyMember;
   profile: Profile;

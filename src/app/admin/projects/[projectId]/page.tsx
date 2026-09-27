@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { TestRow } from "@/components/test-row";
 import { CertificatesPanel } from "@/components/admin/certificates-panel";
+import { AcSystemsPanel } from "@/components/admin/ac-systems-panel";
 import {
   ProjectDetailsForm,
   ProjectTestSettings,
@@ -15,32 +16,35 @@ import {
   listProjectCertificates,
   listProjectTests,
 } from "@/lib/data";
+import { getAcProjectSettings, listProjectAcCertificates, listProjectAcSystems } from "@/lib/ac/data";
 import { createClient } from "@/lib/supabase/server";
 import type { PressureTest, TestProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "tests" | "details" | "certificates";
-const TABS: { key: Tab; label: string }[] = [
-  { key: "tests", label: "Tests" },
-  { key: "details", label: "Project details" },
-  { key: "certificates", label: "Certificates" },
-];
+type Tab = "tests" | "details" | "certificates" | "ac";
 
 export default async function AdminProjectPage(
   props: PageProps<"/admin/projects/[projectId]">,
 ) {
   const { projectId } = await props.params;
   const sp = await props.searchParams;
-  const tab: Tab = ["tests", "details", "certificates"].includes(String(sp.tab))
-    ? (sp.tab as Tab)
-    : "tests";
 
-  const [project, { company }] = await Promise.all([
+  const [project, { company, modules }] = await Promise.all([
     getProject(projectId),
     getWorkspace(),
   ]);
   if (!project) notFound();
+
+  const hasAc = modules.includes("ac_commissioning");
+  const TABS: { key: Tab; label: string }[] = [
+    { key: "tests", label: "Tests" },
+    { key: "details", label: "Project details" },
+    { key: "certificates", label: "Certificates" },
+    ...(hasAc ? [{ key: "ac" as const, label: "AC Systems" }] : []),
+  ];
+  const validTabs = TABS.map((t) => t.key);
+  const tab: Tab = validTabs.includes(sp.tab as Tab) ? (sp.tab as Tab) : "tests";
 
   const tests = await listProjectTests(projectId);
   const by = (s: PressureTest["status"]) => tests.filter((t) => t.status === s);
@@ -119,6 +123,15 @@ export default async function AdminProjectPage(
           projectId={projectId}
           passedTests={passed}
           certificates={await listProjectCertificates(projectId)}
+        />
+      ) : null}
+
+      {tab === "ac" && hasAc ? (
+        <AcSystemsPanel
+          projectId={projectId}
+          systems={await listProjectAcSystems(projectId)}
+          certificates={await listProjectAcCertificates(projectId)}
+          projectSettings={await getAcProjectSettings(projectId)}
         />
       ) : null}
     </div>

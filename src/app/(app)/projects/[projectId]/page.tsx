@@ -3,14 +3,20 @@ import { notFound } from "next/navigation";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { TestRow } from "@/components/test-row";
 import { BackLink, LinkButton } from "@/components/ui";
-import { getProject, listProjectTests } from "@/lib/data";
+import { getProject, getWorkspace, listProjectTests } from "@/lib/data";
 import type { PressureTest } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const PlusIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+  </svg>
+);
+
 export default async function ProjectPage(props: PageProps<"/projects/[projectId]">) {
   const { projectId } = await props.params;
-  const project = await getProject(projectId);
+  const [project, { modules }] = await Promise.all([getProject(projectId), getWorkspace()]);
   if (!project) notFound();
 
   const tests = await listProjectTests(projectId);
@@ -35,16 +41,29 @@ export default async function ProjectPage(props: PageProps<"/projects/[projectId
         ) : null}
       </div>
 
-      <LinkButton
-        href={`/projects/${project.id}/tests/new`}
-        size="lg"
-        className="mb-6 w-full"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-        </svg>
-        New test
-      </LinkButton>
+      {modules.includes("ac_commissioning") ? (
+        <div className="mb-6 flex gap-3">
+          {modules.includes("plumbing") ? (
+            <LinkButton href={`/projects/${project.id}/tests/new`} size="lg" className="flex-1">
+              {PlusIcon}
+              New test
+            </LinkButton>
+          ) : null}
+          <LinkButton href={`/projects/${project.id}/ac/new`} size="lg" className="flex-1">
+            {PlusIcon}
+            New system
+          </LinkButton>
+        </div>
+      ) : (
+        <LinkButton
+          href={`/projects/${project.id}/tests/new`}
+          size="lg"
+          className="mb-6 w-full"
+        >
+          {PlusIcon}
+          New test
+        </LinkButton>
+      )}
 
       <CollapsibleSection title="In progress" count={inProgress.length} defaultOpen>
         {inProgress.map((t) => (

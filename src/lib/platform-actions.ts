@@ -62,6 +62,12 @@ export async function createCompanyWithAdminAction(
   });
   if (profileErr) return { error: profileErr.message };
 
+  const { error: modulesErr } = await admin.from("company_modules").insert([
+    { company_id: company.id, module: "plumbing", enabled: true },
+    { company_id: company.id, module: "ac_commissioning", enabled: false },
+  ]);
+  if (modulesErr) return { error: modulesErr.message };
+
   await admin.from("audit_events").insert({
     company_id: company.id,
     actor_id: account.userId,
@@ -97,6 +103,38 @@ export async function platformSetMemberStatusAction(
     .eq("company_id", companyId)
     .eq("user_id", userId);
   if (error) return { error: error.message };
+  revalidatePath(`/platform/companies/${companyId}`);
+  return { ok: true };
+}
+
+/** Platform admin: enable/disable a module for a company. */
+export async function platformSetModuleEnabledAction(
+  companyId: string,
+  module: "plumbing" | "ac_commissioning",
+  enabled: boolean,
+): Promise<ProvisionActionResult> {
+  const user = await requirePlatformAdmin();
+  const admin = createAdminClient();
+
+  const { error } = await admin.from("company_modules").upsert(
+    {
+      company_id: companyId,
+      module,
+      enabled,
+      updated_at: new Date().toISOString(),
+      updated_by: user.id,
+    },
+    { onConflict: "company_id,module" },
+  );
+  if (error) return { error: error.message };
+
+  await admin.from("audit_events").insert({
+    company_id: companyId,
+    actor_id: user.id,
+    event_type: enabled ? "module_enabled" : "module_disabled",
+    data: { module },
+  });
+
   revalidatePath(`/platform/companies/${companyId}`);
   return { ok: true };
 }
