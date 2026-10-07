@@ -13,6 +13,17 @@ export const AC_SYSTEM_TYPE_META: Record<AcSystemType, { label: string; availabl
   other: { label: "Other", available: false },
 };
 
+/**
+ * Asset QR labels from tagref.co.uk encode a URL (https://tagref.co.uk/a/100108);
+ * the asset number is "R" + the trailing digits (R100108). Anything else is
+ * returned trimmed and untouched.
+ */
+export function assetNumberFromScan(raw: string): string {
+  const value = raw.trim();
+  const match = value.match(/^https?:\/\/(?:www\.)?tagref\.co\.uk\/a\/(\d+)\/?(?:[?#].*)?$/i);
+  return match ? `R${match[1]}` : value;
+}
+
 // ---------------------------------------------------------------------------
 // Manufacturers — the list is not locked; "Other" always escapes to free text.
 // ---------------------------------------------------------------------------

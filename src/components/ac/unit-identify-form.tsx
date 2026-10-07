@@ -9,6 +9,7 @@ import {
   recordAcPhotoAction,
   updateAcUnitAction,
 } from "@/lib/ac/actions";
+import { assetNumberFromScan } from "@/lib/ac/domain";
 import type { AcUnit } from "@/lib/ac/types";
 import { Button, Card, Field, FormError, Muted, inputClass } from "../ui";
 import { QrScanButton } from "./qr-scanner";
@@ -102,7 +103,7 @@ export function UnitIdentifyForm({
       unitId: unit.id,
       reference: showReference ? reference : undefined,
       location: showLocation ? location : undefined,
-      assetNumber,
+      assetNumber: assetNumberFromScan(assetNumber),
       modelNumber,
       serialNumber,
       manufactureDate,
@@ -140,7 +141,7 @@ export function UnitIdentifyForm({
 
       <div>
         <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Asset number</span>
-        <QrScanButton onScan={(v) => setAssetNumber(v)} label={assetNumber ? "Scan again" : "Scan QR label"} full />
+        <QrScanButton onScan={(v) => setAssetNumber(assetNumberFromScan(v))} label={assetNumber ? "Scan again" : "Scan QR label"} full />
         <input
           value={assetNumber}
           onChange={(e) => setAssetNumber(e.target.value)}
