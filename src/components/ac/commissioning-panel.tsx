@@ -117,9 +117,59 @@ export function CommissioningPanel({
   const set = (key: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
   const num = (v: string) => (v ? Number(v) : undefined);
 
-  const saveDetails = async (thenNavigate: boolean) => {
+  const initialTemps = (): Record<string, TempValues> =>
+    Object.fromEntries(
+      indoorUnits.map((u) => {
+        const c = temperatureReadings.find((r) => r.ac_unit_id === u.id && r.mode === "cooling");
+        const h = temperatureReadings.find((r) => r.ac_unit_id === u.id && r.mode === "heating");
+        return [
+          u.id,
+          {
+            coolOn: c?.air_on_c?.toString() ?? "",
+            coolOff: c?.air_off_c?.toString() ?? "",
+            heatOn: h?.air_on_c?.toString() ?? "",
+            heatOff: h?.air_off_c?.toString() ?? "",
+          },
+        ];
+      }),
+    );
+  const [savedTemps] = useState(initialTemps);
+  const [temps, setTemps] = useState(initialTemps);
+  const setTemp = (unitId: string, key: keyof TempValues) => (v: string) =>
+    setTemps((t) => ({ ...t, [unitId]: { ...t[unitId], [key]: v } }));
+
+  // One Save for the whole page. Temperature readings are only sent when
+  // changed, so re-saving doesn't re-stamp who/when for untouched readings.
+  const saveAll = async () => {
     setSaveBusy(true);
     setError(null);
+    const tempCalls = indoorUnits.flatMap((u) => {
+      const cur = temps[u.id];
+      const was = savedTemps[u.id];
+      const calls = [];
+      if (cur.coolOn !== was.coolOn || cur.coolOff !== was.coolOff) {
+        calls.push(
+          upsertAcTemperatureReadingAction({
+            acUnitId: u.id,
+            mode: "cooling",
+            airOnC: num(cur.coolOn),
+            airOffC: num(cur.coolOff),
+          }),
+        );
+      }
+      if (cur.heatOn !== was.heatOn || cur.heatOff !== was.heatOff) {
+        calls.push(
+          upsertAcTemperatureReadingAction({
+            acUnitId: u.id,
+            mode: "heating",
+            airOnC: num(cur.heatOn),
+            airOffC: num(cur.heatOff),
+          }),
+        );
+      }
+      return calls;
+    });
+    const tempResults = await Promise.all(tempCalls);
     const res = await updateAcCommissioningAction(acSystemId, {
       mcbFuseSpec: form.mcb,
       outdoorNameplateFlcAmps: num(form.flc),
@@ -133,17 +183,16 @@ export function CommissioningPanel({
       currentHeatingL3: num(form.heatingL3),
     });
     setSaveBusy(false);
-    if (res.error) {
-      setError(res.error);
+    const failed = tempResults.find((r) => r.error) ?? (res.error ? res : undefined);
+    if (failed) {
+      setError(failed.error!);
       return;
     }
-    if (thenNavigate) router.push(`/projects/${projectId}/ac/${acSystemId}`);
-    else router.refresh();
+    router.push(`/projects/${projectId}/ac/${acSystemId}`);
   };
 
   return (
     <div className="space-y-4">
-      <FormError>{error}</FormError>
       <Card className="p-4">
         <p className="mb-3 text-[14px] font-semibold">Installation checks</p>
         <div className="space-y-2.5">
@@ -216,10 +265,6 @@ export function CommissioningPanel({
         </div>
       </Card>
 
-      <Button size="lg" className="w-full" disabled={saveBusy} onClick={() => saveDetails(false)}>
-        {saveBusy ? "Saving…" : "Save electrical, pipework & currents"}
-      </Button>
-
       {indoorUnits.map((unit) => (
         <TemperatureCard
           key={unit.id}
@@ -227,20 +272,24 @@ export function CommissioningPanel({
           cooling={temperatureReadings.find((r) => r.ac_unit_id === unit.id && r.mode === "cooling")}
           heating={temperatureReadings.find((r) => r.ac_unit_id === unit.id && r.mode === "heating")}
           memberNames={memberNames}
+          values={temps[unit.id]}
+          onChange={(key) => setTemp(unit.id, key)}
         />
       ))}
 
-      <Button
-        size="lg"
-        variant="secondary"
-        className="w-full"
-        disabled={saveBusy}
-        onClick={() => saveDetails(true)}
-      >
-        Done — back to {systemRef}
+      <FormError>{error}</FormError>
+      <Button size="lg" className="w-full" disabled={saveBusy} onClick={saveAll}>
+        {saveBusy ? "Saving…" : `Save — back to ${systemRef}`}
       </Button>
     </div>
   );
+}
+
+interface TempValues {
+  coolOn: string;
+  coolOff: string;
+  heatOn: string;
+  heatOff: string;
 }
 
 function TemperatureCard({
@@ -248,58 +297,30 @@ function TemperatureCard({
   cooling,
   heating,
   memberNames,
+  values,
+  onChange,
 }: {
   unit: AcUnit;
   cooling?: AcTemperatureReading;
   heating?: AcTemperatureReading;
   memberNames: Record<string, string>;
+  values: TempValues;
+  onChange: (key: keyof TempValues) => (v: string) => void;
 }) {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const [coolOn, setCoolOn] = useState(cooling?.air_on_c?.toString() ?? "");
-  const [coolOff, setCoolOff] = useState(cooling?.air_off_c?.toString() ?? "");
-  const [heatOn, setHeatOn] = useState(heating?.air_on_c?.toString() ?? "");
-  const [heatOff, setHeatOff] = useState(heating?.air_off_c?.toString() ?? "");
-
+  const { coolOn, coolOff, heatOn, heatOff } = values;
   const coolingDelta = coolOn && coolOff ? (Number(coolOn) - Number(coolOff)).toFixed(1) : null;
   const heatingDelta = heatOn && heatOff ? (Number(heatOff) - Number(heatOn)).toFixed(1) : null;
-
-  const save = async () => {
-    setBusy(true);
-    setError(null);
-    const results = await Promise.all([
-      upsertAcTemperatureReadingAction({
-        acUnitId: unit.id,
-        mode: "cooling",
-        airOnC: coolOn ? Number(coolOn) : undefined,
-        airOffC: coolOff ? Number(coolOff) : undefined,
-      }),
-      upsertAcTemperatureReadingAction({
-        acUnitId: unit.id,
-        mode: "heating",
-        airOnC: heatOn ? Number(heatOn) : undefined,
-        airOffC: heatOff ? Number(heatOff) : undefined,
-      }),
-    ]);
-    setBusy(false);
-    const failed = results.find((r) => r.error);
-    if (failed) setError(failed.error!);
-    else router.refresh();
-  };
 
   return (
     <Card className="p-4">
       <p className="mb-3 text-[14px] font-semibold">
         {unit.reference || "Indoor unit"} — Temperatures
       </p>
-      <FormError>{error}</FormError>
 
       <p className="mb-1.5 text-[13px] font-medium text-ink-soft">Cooling</p>
       <div className="grid grid-cols-2 gap-3">
-        <NumField label="Air on (°C)" value={coolOn} onChange={setCoolOn} />
-        <NumField label="Air off (°C)" value={coolOff} onChange={setCoolOff} />
+        <NumField label="Air on (°C)" value={coolOn} onChange={onChange("coolOn")} />
+        <NumField label="Air off (°C)" value={coolOff} onChange={onChange("coolOff")} />
       </div>
       {coolingDelta !== null ? <Muted className="mt-1.5 block">Cooling ΔT: {coolingDelta}°C</Muted> : null}
       {cooling?.recorded_by ? (
@@ -308,17 +329,13 @@ function TemperatureCard({
 
       <p className="mb-1.5 mt-4 text-[13px] font-medium text-ink-soft">Heating</p>
       <div className="grid grid-cols-2 gap-3">
-        <NumField label="Air on (°C)" value={heatOn} onChange={setHeatOn} />
-        <NumField label="Air off (°C)" value={heatOff} onChange={setHeatOff} />
+        <NumField label="Air on (°C)" value={heatOn} onChange={onChange("heatOn")} />
+        <NumField label="Air off (°C)" value={heatOff} onChange={onChange("heatOff")} />
       </div>
       {heatingDelta !== null ? <Muted className="mt-1.5 block">Heating ΔT: {heatingDelta}°C</Muted> : null}
       {heating?.recorded_by ? (
         <Muted className="mt-0.5 block">{memberNames[heating.recorded_by] ?? "Someone"} · {heating.recorded_at ? new Date(heating.recorded_at).toLocaleDateString("en-GB") : ""}</Muted>
       ) : null}
-
-      <Button size="sm" variant="secondary" className="mt-4" disabled={busy} onClick={save}>
-        {busy ? "Saving…" : "Save temperatures"}
-      </Button>
     </Card>
   );
 }
