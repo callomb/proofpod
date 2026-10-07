@@ -27,8 +27,6 @@ const line = "#d8d8d4";
 const paper = "#ffffff";
 const canvas = "#f6f6f5";
 const lineSoft = "#e7e7e4";
-const pass = "#1f9d55";
-const passSoft = "#e7f4ec";
 
 const s = StyleSheet.create({
   page: { paddingTop: 48, paddingBottom: 56, paddingHorizontal: 48, fontSize: 9, color: ink, fontFamily: "Helvetica", lineHeight: 1.5 },
@@ -68,15 +66,12 @@ const fs = StyleSheet.create({
   companyName: { fontSize: 10.5, fontFamily: "Helvetica-Bold", textAlign: "right" },
   companyLine: { fontSize: 8, color: muted, textAlign: "right" },
 
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18 },
+  titleRow: { marginBottom: 18 },
   eyebrow: { fontSize: 8, fontFamily: "Helvetica-Bold", color: muted, textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 4 },
-  h1: { fontSize: 19, fontFamily: "Helvetica-Bold", marginBottom: 6 },
+  h1: { fontSize: 19, fontFamily: "Helvetica-Bold", marginBottom: 8 },
   metaRow: { flexDirection: "row", gap: 6 },
   metaText: { fontSize: 8.5, color: muted },
 
-  statusBadge: { borderWidth: 1, borderColor: pass, backgroundColor: passSoft, borderRadius: 4, paddingVertical: 8, paddingHorizontal: 14, alignItems: "center", minWidth: 150 },
-  statusBadgeTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: pass, textTransform: "uppercase", letterSpacing: 0.5 },
-  statusBadgeSub: { fontSize: 13, fontFamily: "Helvetica-Bold", color: pass, marginTop: 2, letterSpacing: 1 },
 
   section: { borderWidth: 1, borderColor: line, marginBottom: 14 },
   sectionHeader: { backgroundColor: canvas, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: line },
@@ -364,10 +359,6 @@ function TitleBlock({ number, snapshot }: { number: string; snapshot: AcCertific
           <Text style={fs.metaText}>·</Text>
           <Text style={fs.metaText}>{snapshot.system.system_ref}</Text>
         </View>
-      </View>
-      <View style={fs.statusBadge}>
-        <Text style={fs.statusBadgeTitle}>Commissioning Complete</Text>
-        <Text style={fs.statusBadgeSub}>PASS</Text>
       </View>
     </View>
   );
