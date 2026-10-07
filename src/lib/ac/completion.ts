@@ -76,7 +76,10 @@ export function acSystemCompletion(input: {
   }
 
   if (!charge || charge.factory_charge_kg === null || charge.actual_additional_kg === null) {
-    missing.push({ label: "Refrigerant charge", href: `${base}/evacuation-charge` });
+    missing.push({
+      label: "Refrigerant charge (factory charge, and additional added — 0 if none)",
+      href: `${base}/evacuation-charge`,
+    });
   }
 
   const c = commissioning;

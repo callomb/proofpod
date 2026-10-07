@@ -259,15 +259,31 @@ function ChargeSection({
             placeholder="e.g. 2.00"
           />
         </label>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="mt-2"
-          onClick={() => setShowCalculator((s) => !s)}
-        >
-          {showCalculator ? "Hide calculator" : "Calculate additional charge"}
-        </Button>
+        <Muted className="mt-1.5 block">
+          Required to complete the system — enter 0 if no extra refrigerant was added.
+        </Muted>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              setActualAdditional("0");
+              saveField({ additionalMethod: "manual", actualAdditionalKg: 0 });
+            }}
+          >
+            None added
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowCalculator((s) => !s)}
+          >
+            {showCalculator ? "Hide calculator" : "Calculate additional charge"}
+          </Button>
+        </div>
 
         {showCalculator ? (
           <div className="mt-3 space-y-2">
