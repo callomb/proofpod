@@ -6,6 +6,7 @@ import {
   getAcCharge,
   getAcCommissioning,
   getAcEvacuation,
+  getAcFgasLabelRequest,
   getAcSystem,
   listAcDrainTests,
   listAcPressureTests,
@@ -23,7 +24,7 @@ export default async function AcSystemPage(
   const [project, system] = await Promise.all([getProject(projectId), getAcSystem(systemId)]);
   if (!project || !system || system.project_id !== projectId) notFound();
 
-  const [units, pressureTests, evacuation, charge, commissioning, temperatureReadings, drainTests] =
+  const [units, pressureTests, evacuation, charge, commissioning, temperatureReadings, drainTests, fgasRequest] =
     await Promise.all([
       listAcUnits(systemId),
       listAcPressureTests(systemId),
@@ -32,6 +33,7 @@ export default async function AcSystemPage(
       getAcCommissioning(systemId),
       listAcTemperatureReadings(systemId),
       listAcDrainTests(systemId),
+      getAcFgasLabelRequest(systemId),
     ]);
 
   const completion = acSystemCompletion({
@@ -56,6 +58,7 @@ export default async function AcSystemPage(
       evacuation={evacuation}
       drainTests={drainTests}
       completion={completion}
+      fgasRequest={fgasRequest}
     />
   );
 }

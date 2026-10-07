@@ -12,6 +12,7 @@ import type {
   AcCommissioning,
   AcDrainTest,
   AcEvacuation,
+  AcFgasLabelRequest,
   AcPhoto,
   AcPressureTest,
   AcPressureTestStage,
@@ -190,6 +191,16 @@ export async function listStandaloneAcPressureTests(projectId: string): Promise<
     latestPerLineage.push(row);
   }
   return latestPerLineage;
+}
+
+export async function getAcFgasLabelRequest(acSystemId: string): Promise<AcFgasLabelRequest | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ac_fgas_label_requests")
+    .select("*")
+    .eq("ac_system_id", acSystemId)
+    .maybeSingle<AcFgasLabelRequest>();
+  return data;
 }
 
 export async function getAcEvacuation(acSystemId: string): Promise<AcEvacuation | null> {

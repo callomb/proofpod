@@ -382,3 +382,19 @@ export interface AcAuditEvent {
   data: Record<string, unknown>;
   created_at: string;
 }
+
+export type AcFgasLabelStatus = "pending" | "sent" | "failed";
+
+export interface AcFgasLabelRequest {
+  id: string;
+  company_id: string;
+  project_id: string;
+  ac_system_id: string;
+  payload: Record<string, unknown>;
+  status: AcFgasLabelStatus;
+  attempts: number;
+  last_error: string | null;
+  sent_at: string | null;
+  requested_by: string | null;
+  requested_at: string;
+}

@@ -9,9 +9,17 @@ import {
   unitIdentified,
 } from "@/lib/ac/domain";
 import type { CompletionSummary } from "@/lib/ac/completion";
-import type { AcDrainTest, AcEvacuation, AcPressureTest, AcSystem, AcUnit } from "@/lib/ac/types";
+import type {
+  AcDrainTest,
+  AcEvacuation,
+  AcFgasLabelRequest,
+  AcPressureTest,
+  AcSystem,
+  AcUnit,
+} from "@/lib/ac/types";
 import { BackLink, Card, StatusDot } from "../ui";
 import { CompleteSystemButton } from "./complete-system-button";
+import { FgasLabelCard } from "./fgas-label-card";
 import { VoidSystemButton } from "./void-system-button";
 
 type Tone = "pass" | "progress" | "fail" | "void";
@@ -98,6 +106,7 @@ export function AcSystemDashboard({
   evacuation,
   drainTests,
   completion,
+  fgasRequest,
 }: {
   projectId: string;
   projectName: string;
@@ -107,6 +116,7 @@ export function AcSystemDashboard({
   evacuation: AcEvacuation | null;
   drainTests: AcDrainTest[];
   completion: CompletionSummary;
+  fgasRequest: AcFgasLabelRequest | null;
 }) {
   const outdoor = outdoorUnit(units);
   const indoors = indoorUnits(units);
@@ -175,6 +185,12 @@ export function AcSystemDashboard({
           tone={drainStatus.tone}
         />
       </div>
+
+      {system.status === "complete" ? (
+        <div className="mt-6">
+          <FgasLabelCard acSystemId={system.id} request={fgasRequest} />
+        </div>
+      ) : null}
 
       {system.status === "in_progress" ? (
         <div className="mt-6">
