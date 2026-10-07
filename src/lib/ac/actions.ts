@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../supabase/server";
 import { createAdminClient } from "../supabase/admin";
 import { extractDataPlate } from "./vision";
+import { lookupTagrefAsset } from "./tagref";
 import type { AcPhotoSubject } from "./types";
 
 export interface ActionResult {
@@ -84,6 +85,17 @@ export async function updateAcUnitAction(input: {
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Looks up a scanned Tagref QR label's reference + area. Null = not found / unavailable. */
+export async function lookupTagrefAssetAction(
+  scanned: string,
+): Promise<{ reference: string | null; area: string | null } | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return null;
+  const asset = await lookupTagrefAsset(scanned);
+  return asset ? { reference: asset.reference, area: asset.area } : null;
 }
 
 export async function saveAcUnitOcrAction(

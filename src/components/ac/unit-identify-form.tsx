@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   extractDataPlateAction,
+  lookupTagrefAssetAction,
   recordAcPhotoAction,
   updateAcUnitAction,
 } from "@/lib/ac/actions";
@@ -59,6 +60,24 @@ export function UnitIdentifyForm({
   const [saveBusy, setSaveBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
+  const [tagNote, setTagNote] = useState<string | null>(null);
+
+  const onScan = async (raw: string) => {
+    setAssetNumber(assetNumberFromScan(raw));
+    setTagNote(null);
+    const found = await lookupTagrefAssetAction(raw);
+    if (!found) return;
+    const filled: string[] = [];
+    if (found.reference && showReference) {
+      setReference(found.reference);
+      filled.push("reference");
+    }
+    if (found.area && showLocation) {
+      setLocation(found.area);
+      filled.push("location");
+    }
+    if (filled.length) setTagNote(`Filled the ${filled.join(" and ")} from the label — check before saving.`);
+  };
 
   const onDataPlateFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,7 +160,7 @@ export function UnitIdentifyForm({
 
       <div>
         <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Asset number</span>
-        <QrScanButton onScan={(v) => setAssetNumber(assetNumberFromScan(v))} label={assetNumber ? "Scan again" : "Scan QR label"} full />
+        <QrScanButton onScan={onScan} label={assetNumber ? "Scan again" : "Scan QR label"} full />
         <input
           value={assetNumber}
           onChange={(e) => setAssetNumber(e.target.value)}
@@ -149,6 +168,7 @@ export function UnitIdentifyForm({
           placeholder="Or enter manually"
           autoComplete="off"
         />
+        {tagNote ? <p className="mt-2 text-[12px] text-muted">{tagNote}</p> : null}
       </div>
 
       <Card className="p-4">
