@@ -383,7 +383,7 @@ export interface AcAuditEvent {
   created_at: string;
 }
 
-export type AcFgasLabelStatus = "pending" | "sent" | "failed";
+export type AcFgasLabelStatus = "requested" | "produced";
 
 export interface AcFgasLabelRequest {
   id: string;
@@ -392,9 +392,8 @@ export interface AcFgasLabelRequest {
   ac_system_id: string;
   payload: Record<string, unknown>;
   status: AcFgasLabelStatus;
-  attempts: number;
-  last_error: string | null;
-  sent_at: string | null;
+  tagref_asset_id: number | null;
+  produced_at: string | null;
   requested_by: string | null;
   requested_at: string;
 }
