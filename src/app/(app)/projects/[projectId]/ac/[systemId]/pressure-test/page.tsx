@@ -44,6 +44,8 @@ export default async function AcPressureTestPage(
         photos={photos}
         photoUrls={photoUrls}
         memberNames={memberNames}
+        doneHref={`/projects/${projectId}/ac/${systemId}`}
+        doneLabel={system.system_ref}
       />
     </div>
   );

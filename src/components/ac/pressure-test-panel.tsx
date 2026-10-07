@@ -12,7 +12,7 @@ import {
   startAcPressureTestStageAction,
 } from "@/lib/ac/actions";
 import type { AcPhoto, AcPressureTest, AcPressureTestStage } from "@/lib/ac/types";
-import { Button, Card, FormError, Muted, StatusDot } from "../ui";
+import { Button, Card, FormError, LinkButton, Muted, StatusDot } from "../ui";
 
 async function uploadEvidence(
   file: File,
@@ -127,6 +127,8 @@ export function PressureTestPanel({
   photos,
   photoUrls,
   memberNames,
+  doneHref,
+  doneLabel,
 }: {
   /** Null for a standalone pressure test (no System) — only affects the retest path here. */
   acSystemId: string | null;
@@ -139,6 +141,8 @@ export function PressureTestPanel({
   photos: AcPhoto[];
   photoUrls: Record<string, string>;
   memberNames: Record<string, string>;
+  doneHref: string;
+  doneLabel: string;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -294,6 +298,17 @@ export function PressureTestPanel({
           <Button size="lg" className="mt-4 w-full" disabled={retestBusy} onClick={startNew}>
             {retestBusy ? "Working…" : "Repair & retest"}
           </Button>
+        ) : null}
+
+        {current.status !== "in_progress" ? (
+          <LinkButton
+            href={doneHref}
+            variant={current.status === "passed" ? "primary" : "secondary"}
+            size="lg"
+            className="mt-3 w-full"
+          >
+            Back to {doneLabel}
+          </LinkButton>
         ) : null}
       </Card>
 

@@ -46,6 +46,8 @@ export default async function StandaloneAcPressureTestPage(
         photos={photos}
         photoUrls={photoUrls}
         memberNames={memberNames}
+        doneHref={`/projects/${projectId}?module=ac_commissioning`}
+        doneLabel={project.name}
       />
     </div>
   );
