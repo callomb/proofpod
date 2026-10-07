@@ -450,6 +450,12 @@ function EquipCard({
       <Text style={fs.equipValue}>{unit?.model_number ?? "—"}</Text>
       <Text style={fs.equipLabel}>Serial</Text>
       <Text style={fs.equipValue}>{unit?.serial_number ?? "—"}</Text>
+      {unit?.manufacture_date ? (
+        <>
+          <Text style={fs.equipLabel}>Date of manufacture</Text>
+          <Text style={fs.equipValue}>{unit.manufacture_date}</Text>
+        </>
+      ) : null}
     </View>
   );
 }

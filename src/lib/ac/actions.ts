@@ -69,6 +69,7 @@ export async function updateAcUnitAction(input: {
   assetNumber?: string | null;
   modelNumber?: string | null;
   serialNumber?: string | null;
+  manufactureDate?: string | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("update_ac_unit", {
@@ -78,6 +79,7 @@ export async function updateAcUnitAction(input: {
     p_asset_number: input.assetNumber ?? null,
     p_model_number: input.modelNumber ?? null,
     p_serial_number: input.serialNumber ?? null,
+    p_manufacture_date: input.manufactureDate ?? null,
   });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
@@ -97,6 +99,7 @@ export async function saveAcUnitOcrAction(
 export interface ExtractResult extends ActionResult {
   model?: string | null;
   serial?: string | null;
+  manufactureDate?: string | null;
 }
 
 /**
@@ -123,7 +126,7 @@ export async function extractDataPlateAction(
   if (!supportedTypes.includes(mime as SupportedMediaType)) {
     // e.g. HEIC — not something the vision model accepts. The photo is
     // already saved; the engineer just enters model/serial manually.
-    return { ok: true, model: null, serial: null };
+    return { ok: true, model: null, serial: null, manufactureDate: null };
   }
 
   const admin = createAdminClient();
@@ -137,10 +140,14 @@ export async function extractDataPlateAction(
 
   await supabase.rpc("save_ac_unit_ocr", {
     p_unit_id: unitId,
-    p_ocr: { model: result.model, serial: result.serial, raw: result.raw, ranAt: new Date().toISOString() },
+    p_ocr: {
+      model: result.model,
+      serial: result.serial,
+      manufactureDate: result.manufactureDate,
+      raw: result.raw, ranAt: new Date().toISOString() },
   });
 
-  return { ok: true, model: result.model, serial: result.serial };
+  return { ok: true, model: result.model, serial: result.serial, manufactureDate: result.manufactureDate };
 }
 
 // ===========================================================================

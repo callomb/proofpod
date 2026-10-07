@@ -5,13 +5,14 @@ import Anthropic from "@anthropic-ai/sdk";
 export interface DataPlateExtraction {
   model: string | null;
   serial: string | null;
+  manufactureDate: string | null;
   raw: string;
 }
 
-const EMPTY: DataPlateExtraction = { model: null, serial: null, raw: "" };
+const EMPTY: DataPlateExtraction = { model: null, serial: null, manufactureDate: null, raw: "" };
 
 /**
- * Suggests a model/serial number from a data-plate photo. Never authoritative
+ * Suggests a model/serial number and date of manufacture from a data-plate photo. Never authoritative
  * on its own — the caller must still have the engineer confirm or correct the
  * result before it's saved as the unit's model/serial number.
  */
@@ -28,7 +29,7 @@ export async function extractDataPlate(
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
       model: "claude-sonnet-5",
-      max_tokens: 300,
+      max_tokens: 400,
       messages: [
         {
           role: "user",
@@ -38,9 +39,11 @@ export async function extractDataPlate(
               type: "text",
               text:
                 "This is a photo of an air conditioning unit's data plate / nameplate. " +
-                "Read the MODEL NUMBER and SERIAL NUMBER printed on it. Reply with strict JSON " +
-                'only, no other text: {"model": string or null, "serial": string or null}. ' +
-                "If a value isn't clearly legible, use null for it rather than guessing.",
+                "Read the MODEL NUMBER, SERIAL NUMBER and DATE OF MANUFACTURE printed on it " +
+                "(the date is often labelled 'Date of manufacture', 'Mfg date', 'Manufactured' or similar; " +
+                "copy it exactly as printed, e.g. '03/2024'). Reply with strict JSON " +
+                'only, no other text: {"model": string or null, "serial": string or null, "manufactureDate": string or null}. ' +
+                "If a value isn't printed or clearly legible, use null for it rather than guessing.",
             },
           ],
         },
@@ -55,10 +58,15 @@ export async function extractDataPlate(
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { ...EMPTY, raw: text };
-    const parsed = JSON.parse(jsonMatch[0]) as { model?: string | null; serial?: string | null };
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      model?: string | null;
+      serial?: string | null;
+      manufactureDate?: string | null;
+    };
     return {
       model: parsed.model ? String(parsed.model).trim() : null,
       serial: parsed.serial ? String(parsed.serial).trim() : null,
+      manufactureDate: parsed.manufactureDate ? String(parsed.manufactureDate).trim() : null,
       raw: text,
     };
   } catch (err) {

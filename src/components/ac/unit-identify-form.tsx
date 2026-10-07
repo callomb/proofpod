@@ -52,6 +52,7 @@ export function UnitIdentifyForm({
   const [assetNumber, setAssetNumber] = useState(unit.asset_number ?? "");
   const [modelNumber, setModelNumber] = useState(unit.model_number ?? "");
   const [serialNumber, setSerialNumber] = useState(unit.serial_number ?? "");
+  const [manufactureDate, setManufactureDate] = useState(unit.manufacture_date ?? "");
 
   const [photoBusy, setPhotoBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -79,9 +80,10 @@ export function UnitIdentifyForm({
 
       const extracted = await extractDataPlateAction(unit.id, path, mime);
       if (extracted.error) throw new Error(extracted.error);
-      if (extracted.model || extracted.serial) {
+      if (extracted.model || extracted.serial || extracted.manufactureDate) {
         if (extracted.model) setModelNumber(extracted.model);
         if (extracted.serial) setSerialNumber(extracted.serial);
+        if (extracted.manufactureDate) setManufactureDate(extracted.manufactureDate);
         setOcrNote("Suggested from the photo — check and correct before saving.");
       } else {
         setOcrNote("Photo saved. Couldn't read the model/serial automatically — enter them below.");
@@ -103,6 +105,7 @@ export function UnitIdentifyForm({
       assetNumber,
       modelNumber,
       serialNumber,
+      manufactureDate,
     });
     setSaveBusy(false);
     if (res.error) setError(res.error);
@@ -185,6 +188,15 @@ export function UnitIdentifyForm({
               onChange={(e) => setSerialNumber(e.target.value)}
               className={inputClass}
               placeholder="Enter or confirm from photo"
+              autoComplete="off"
+            />
+          </Field>
+          <Field label="Date of manufacture" hint="Optional — only if printed on the plate">
+            <input
+              value={manufactureDate}
+              onChange={(e) => setManufactureDate(e.target.value)}
+              className={inputClass}
+              placeholder="e.g. 03/2024"
               autoComplete="off"
             />
           </Field>

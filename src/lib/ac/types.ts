@@ -54,7 +54,8 @@ export interface AcUnit {
   asset_number: string | null;
   model_number: string | null;
   serial_number: string | null;
-  ocr_extracted: { model?: string; serial?: string; raw?: string; ranAt?: string } | null;
+  manufacture_date: string | null;
+  ocr_extracted: { model?: string; serial?: string; manufactureDate?: string; raw?: string; ranAt?: string } | null;
   confirmed_at: string | null;
   confirmed_by: string | null;
   created_at: string;
@@ -268,6 +269,7 @@ export interface AcCertificateSnapshot {
     asset_number: string | null;
     model_number: string | null;
     serial_number: string | null;
+    manufacture_date?: string | null;
   }[];
   pressure_test: {
     attempt_no: number;
