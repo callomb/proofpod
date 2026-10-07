@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Supabase CLI local cache/session state
 supabase/.temp
+
+# Customer data exported from Tagref for the one-off migration — never commit
+/tagref-export/
