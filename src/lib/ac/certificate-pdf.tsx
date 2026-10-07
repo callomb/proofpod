@@ -98,8 +98,8 @@ const fs = StyleSheet.create({
   equipLabel: { fontSize: 7, color: muted, textTransform: "uppercase", letterSpacing: 0.4 },
   equipValue: { fontSize: 8.5, marginBottom: 3 },
 
-  evidenceGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  evidenceCard: { width: "31%", marginBottom: 10 },
+  evidenceGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: 9 },
+  evidenceCard: { width: "31.5%", marginBottom: 6 },
   evidenceImg: { width: "100%", height: 92, objectFit: "cover", borderWidth: 1, borderColor: lineSoft },
   evidenceCaption: { fontSize: 8, fontFamily: "Helvetica-Bold", marginTop: 4 },
   evidenceMeta: { fontSize: 7, color: muted, marginTop: 1 },
@@ -108,7 +108,10 @@ const fs = StyleSheet.create({
   certCol: { width: "31%" },
   certValue: { fontSize: 11, fontFamily: "Helvetica-Bold", marginTop: 3 },
   signatureRow: { flexDirection: "row", justifyContent: "space-between" },
-  signatureBox: { width: "48%", borderTopWidth: 1, borderTopColor: ink, paddingTop: 5 },
+  signatureSlot: { width: "48%" },
+  signatureImgWrap: { height: 48, justifyContent: "flex-end" },
+  signatureImg: { height: 44, objectFit: "contain", objectPosition: "left" },
+  signatureBox: { borderTopWidth: 1, borderTopColor: ink, paddingTop: 5 },
 
   footer: { position: "absolute", bottom: 24, left: 48, right: 48, flexDirection: "row", justifyContent: "space-between", fontSize: 7.5, color: muted, borderTopWidth: 1, borderTopColor: lineSoft, paddingTop: 6 },
 });
@@ -456,6 +459,19 @@ function unitLabel(unit: AcCertificateSnapshot["units"][number] | undefined, fal
   return unit.reference || unit.location || fallback;
 }
 
+function SignatureSlot({ label, image }: { label: string; image?: EmbeddedImage }) {
+  return (
+    <View style={fs.signatureSlot}>
+      <View style={fs.signatureImgWrap}>
+        {image ? <Image src={{ data: image.data, format: image.format }} style={fs.signatureImg} /> : null}
+      </View>
+      <View style={fs.signatureBox}>
+        <Text style={fs.equipLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
 function FullFooter({ number }: { number: string }) {
   return (
     <View style={fs.footer} fixed>
@@ -713,12 +729,16 @@ function FullCertificateDoc({
             </View>
           </View>
           <View style={fs.signatureRow}>
-            <View style={fs.signatureBox}>
-              <Text style={fs.equipLabel}>Signature</Text>
-            </View>
-            <View style={fs.signatureBox}>
-              <Text style={fs.equipLabel}>Witness (optional)</Text>
-            </View>
+            <SignatureSlot
+              label="Engineer signature"
+              image={snapshot.engineer_signature_path ? images[snapshot.engineer_signature_path] : undefined}
+            />
+            {snapshot.witness ? (
+              <SignatureSlot
+                label={`Witness${snapshot.witness.name ? ` — ${snapshot.witness.name}` : ""}`}
+                image={images[snapshot.witness.signature_path]}
+              />
+            ) : null}
           </View>
         </Section>
 
@@ -832,6 +852,10 @@ export async function renderAcCertificatePdf(
   }
   if ((docType === "commissioning" || docType === "full") && snapshot.evacuation?.photo) {
     photoPaths.push(snapshot.evacuation.photo.storage_path);
+  }
+  if (docType === "full") {
+    if (snapshot.engineer_signature_path) photoPaths.push(snapshot.engineer_signature_path);
+    if (snapshot.witness?.signature_path) photoPaths.push(snapshot.witness.signature_path);
   }
   const images = await fetchPhotos(photoPaths);
 

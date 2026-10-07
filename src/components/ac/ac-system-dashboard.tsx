@@ -179,7 +179,12 @@ export function AcSystemDashboard({
       {system.status === "in_progress" ? (
         <div className="mt-6">
           {completion.complete ? (
-            <CompleteSystemButton acSystemId={system.id} systemRef={system.system_ref} />
+            <CompleteSystemButton
+              acSystemId={system.id}
+              systemRef={system.system_ref}
+              companyId={system.company_id}
+              projectId={projectId}
+            />
           ) : (
             <Card className="p-4">
               <p className="mb-2 text-[14px] font-semibold">

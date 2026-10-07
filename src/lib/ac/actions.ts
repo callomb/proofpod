@@ -374,9 +374,17 @@ export async function createAcDrainTestAction(input: {
 // ===========================================================================
 // System completion
 // ===========================================================================
-export async function completeAcSystemAction(acSystemId: string): Promise<ActionResult> {
+export async function completeAcSystemAction(
+  acSystemId: string,
+  signatures: { signaturePath: string; witnessName?: string | null; witnessSignaturePath?: string | null },
+): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("complete_ac_system", { p_ac_system_id: acSystemId });
+  const { error } = await supabase.rpc("complete_ac_system", {
+    p_ac_system_id: acSystemId,
+    p_signature_path: signatures.signaturePath,
+    p_witness_name: signatures.witnessName ?? null,
+    p_witness_signature_path: signatures.witnessSignaturePath ?? null,
+  });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };

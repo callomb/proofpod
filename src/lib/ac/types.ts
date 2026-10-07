@@ -38,6 +38,9 @@ export interface AcSystem {
   voided_at: string | null;
   voided_by: string | null;
   void_reason: string | null;
+  engineer_signature_path: string | null;
+  witness_name: string | null;
+  witness_signature_path: string | null;
   created_at: string;
   created_by: string | null;
   updated_at: string;
@@ -331,6 +334,8 @@ export interface AcCertificateSnapshot {
   }[];
   completed_at: string | null;
   completed_by_name?: string | null;
+  engineer_signature_path?: string | null;
+  witness?: { name: string | null; signature_path: string } | null;
   issued_at: string;
 }
 
