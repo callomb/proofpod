@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { createAcDrainTestAction } from "@/lib/ac/actions";
+import { outbox } from "@/lib/ac/outbox";
+import { appliedOps, useOutboxOps } from "@/lib/ac/outbox/hooks";
 import type { AcDrainTest, AcUnit } from "@/lib/ac/types";
 import { Button, Card, FormError, StatusDot, inputClass } from "../ui";
 
@@ -26,6 +27,7 @@ function UnitDrainTest({
   memberNames: Record<string, string>;
 }) {
   const router = useRouter();
+  const ops = useOutboxOps();
   const [drainType, setDrainType] = useState<"pump" | "gravity">("pump");
   const [pumpModel, setPumpModel] = useState("");
   const [waterAdded, setWaterAdded] = useState("");
@@ -37,38 +39,72 @@ function UnitDrainTest({
   const submit = async (result: "passed" | "failed") => {
     setBusy(true);
     setError(null);
-    const res = await createAcDrainTestAction({
-      acUnitId: unit.id,
-      drainType,
-      result,
-      pumpModel: drainType === "pump" ? pumpModel : null,
-      waterAddedLitres: waterAdded ? Number(waterAdded) : null,
-      notes: notes || null,
+    const res = await outbox.enqueue({
+      kind: "drain",
+      lane: `drain:${unit.id}`,
+      scope: unit.ac_system_id,
+      input: {
+        acUnitId: unit.id,
+        drainType,
+        result,
+        pumpModel: drainType === "pump" ? pumpModel : null,
+        waterAddedLitres: waterAdded ? Number(waterAdded) : null,
+        notes: notes || null,
+      },
     });
     setBusy(false);
-    if (res.error) setError(res.error);
+    if (res.status === "error") setError(res.error);
     else {
       setShowForm(false);
-      router.refresh();
+      if (res.status === "done") router.refresh();
     }
   };
+
+  // A test recorded on this phone shows straight away, even before it has been sent.
+  const pendingOp = appliedOps(ops, "drain")
+    .filter((o) => o.spec.input.acUnitId === unit.id)
+    .at(-1);
+  const shown = pendingOp
+    ? {
+        result: pendingOp.spec.input.result,
+        drain_type: pendingOp.spec.input.drainType,
+        pump_model: pendingOp.spec.input.pumpModel ?? null,
+        water_added_litres: pendingOp.spec.input.waterAddedLitres ?? null,
+        who: "You",
+        at: pendingOp.capturedAt,
+        waiting: pendingOp.status !== "synced",
+      }
+    : latest
+      ? {
+          result: latest.result,
+          drain_type: latest.drain_type,
+          pump_model: latest.pump_model,
+          water_added_litres: latest.water_added_litres,
+          who: memberNames[latest.tested_by] ?? "Someone",
+          at: latest.tested_at,
+          waiting: false,
+        }
+      : null;
 
   return (
     <Card className="p-4">
       <p className="mb-3 text-[14px] font-semibold">{unit.reference || "Indoor unit"} — Drain test</p>
 
-      {latest ? (
+      {shown ? (
         <div className="mb-3 flex items-center justify-between rounded-xl bg-canvas p-3">
           <div>
             <span className="inline-flex items-center gap-1.5 text-[13px] font-medium">
-              <StatusDot tone={latest.result === "passed" ? "pass" : "fail"} />
-              {latest.result === "passed" ? "Passed" : "Failed"}
+              <StatusDot tone={shown.result === "passed" ? "pass" : "fail"} />
+              {shown.result === "passed" ? "Passed" : "Failed"}
             </span>
             <p className="mt-0.5 text-[12px] text-muted">
-              {latest.drain_type === "pump" ? `Pump${latest.pump_model ? ` · ${latest.pump_model}` : ""}` : "Gravity"}
-              {latest.water_added_litres ? ` · ${latest.water_added_litres} L` : ""} ·{" "}
-              {memberNames[latest.tested_by] ?? "Someone"} · {fmtDateTime(latest.tested_at)}
+              {shown.drain_type === "pump" ? `Pump${shown.pump_model ? ` · ${shown.pump_model}` : ""}` : "Gravity"}
+              {shown.water_added_litres ? ` · ${shown.water_added_litres} L` : ""} · {shown.who} ·{" "}
+              {fmtDateTime(shown.at)}
             </p>
+            {shown.waiting ? (
+              <p className="mt-0.5 text-[12px] font-medium text-progress">Saved on this phone · waiting to send</p>
+            ) : null}
           </div>
           {!showForm ? (
             <Button type="button" variant="secondary" size="sm" onClick={() => setShowForm(true)}>

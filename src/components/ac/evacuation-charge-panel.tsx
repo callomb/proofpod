@@ -3,31 +3,14 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/client";
-import {
-  completeAcEvacuationAction,
-  recordAcPhotoAction,
-  saveAcEvacuationChecklistAction,
-  updateAcChargeAction,
-  upsertAcChargeCalcLineAction,
-} from "@/lib/ac/actions";
+import { upsertAcChargeCalcLineAction } from "@/lib/ac/actions";
+import { outbox } from "@/lib/ac/outbox";
+import { appliedOps, useOutboxOps, waitingOps } from "@/lib/ac/outbox/hooks";
+import { OFFLINE_MESSAGE, queuePhoto } from "@/lib/ac/outbox/photo";
+import type { OpSpec } from "@/lib/ac/outbox/types";
 import { EVACUATION_CHECKLIST_ITEMS, PIPE_SIZES, chargeRateFor } from "@/lib/ac/domain";
 import type { AcCharge, AcChargeCalcLine, AcChargeRate, AcEvacuation, AcSystem } from "@/lib/ac/types";
 import { Button, Card, FormError, Muted, StatusDot, inputClass } from "../ui";
-
-async function uploadEvidence(
-  file: File,
-  opts: { companyId: string; projectId: string; acSystemId: string },
-): Promise<string> {
-  const supabase = createClient();
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const path = `${opts.companyId}/${opts.projectId}/${opts.acSystemId}/${crypto.randomUUID()}.${ext || "jpg"}`;
-  const { error } = await supabase.storage
-    .from("evidence")
-    .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
-  if (error) throw new Error(error.message);
-  return path;
-}
 
 function EvacuationSection({
   system,
@@ -39,18 +22,35 @@ function EvacuationSection({
   hasFinalPhoto: boolean;
 }) {
   const router = useRouter();
+  const ops = useOutboxOps();
   const fileRef = useRef<HTMLInputElement>(null);
   const [checklist, setChecklist] = useState<Record<string, boolean>>(evacuation.checklist ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const lane = `evac:${system.id}`;
+  const completeOp = appliedOps(ops, "evacComplete").find((o) => o.spec.acSystemId === system.id);
+  const completed = !!evacuation.completed_at || !!completeOp;
+  const photoOps = appliedOps(ops, "photo").filter(
+    (o) => o.spec.record.acSystemId === system.id && o.spec.record.subject === "evacuation_final",
+  );
+  const finalPhoto = hasFinalPhoto || photoOps.length > 0;
+  const photoWaiting = photoOps.some((o) => o.status !== "synced");
+  const waiting = waitingOps(ops, system.id).some((o) => o.spec.lane === lane);
 
   const toggle = async (key: string) => {
     const prev = checklist;
     const next = { ...checklist, [key]: !checklist[key] };
     setChecklist(next);
     setError(null);
-    const res = await saveAcEvacuationChecklistAction(system.id, { [key]: next[key] });
-    if (res.error) {
+    const res = await outbox.enqueue({
+      kind: "evacChecklist",
+      lane,
+      scope: system.id,
+      acSystemId: system.id,
+      checklist: { [key]: next[key] },
+    });
+    if (res.status === "error") {
       setChecklist(prev);
       setError(res.error);
     }
@@ -62,42 +62,38 @@ function EvacuationSection({
     if (!file) return;
     setBusy(true);
     setError(null);
-    try {
-      const path = await uploadEvidence(file, {
-        companyId: system.company_id,
-        projectId: system.project_id,
-        acSystemId: system.id,
-      });
-      const rec = await recordAcPhotoAction({
-        acSystemId: system.id,
-        storagePath: path,
-        subject: "evacuation_final",
-        mime: file.type,
-        sizeBytes: file.size,
-      });
-      if (rec.error) throw new Error(rec.error);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setBusy(false);
-    }
+    const res = await queuePhoto(file, {
+      companyId: system.company_id,
+      projectId: system.project_id,
+      folderId: system.id,
+      lane,
+      scope: system.id,
+      record: { subject: "evacuation_final", acSystemId: system.id },
+    });
+    setBusy(false);
+    if (res.status === "error") setError(res.error);
+    else if (res.status === "done") router.refresh();
   };
 
   const complete = async () => {
     setBusy(true);
     setError(null);
-    const res = await completeAcEvacuationAction(system.id);
+    const res = await outbox.enqueue({
+      kind: "evacComplete",
+      lane,
+      scope: system.id,
+      acSystemId: system.id,
+    });
     setBusy(false);
-    if (res.error) setError(res.error);
-    else router.refresh();
+    if (res.status === "error") setError(res.error);
+    else if (res.status === "done") router.refresh();
   };
 
   return (
     <Card className="p-4">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-[14px] font-semibold">Evacuation</p>
-        {evacuation.completed_at ? (
+        {completed ? (
           <span className="inline-flex items-center gap-1.5 text-[12px] font-medium">
             <StatusDot tone="pass" />
             Complete
@@ -112,7 +108,7 @@ function EvacuationSection({
               type="checkbox"
               checked={!!checklist[item.key]}
               onChange={() => toggle(item.key)}
-              disabled={!!evacuation.completed_at}
+              disabled={completed}
               className="size-5 rounded border-line-strong"
             />
             {item.label}
@@ -126,21 +122,26 @@ function EvacuationSection({
         variant="secondary"
         size="sm"
         className="mt-4"
-        disabled={busy || !!evacuation.completed_at}
+        disabled={busy || completed}
         onClick={() => fileRef.current?.click()}
       >
-        {hasFinalPhoto ? "Retake final photo" : "Photograph final evacuation evidence"}
+        {finalPhoto ? "Retake final photo" : "Photograph final evacuation evidence"}
       </Button>
-      {hasFinalPhoto ? (
-        <p className="mt-1.5 text-[12px] text-muted">Final photo saved.</p>
+      {finalPhoto ? (
+        <p className="mt-1.5 text-[12px] text-muted">
+          {photoWaiting ? "Final photo saved on this phone — waiting to send." : "Final photo saved."}
+        </p>
       ) : (
         <p className="mt-1.5 text-[12px] text-muted">Required before evacuation can be marked complete.</p>
       )}
+      {waiting && !photoWaiting ? (
+        <p className="mt-1 text-[12px] font-medium text-progress">Saved on this phone — waiting to send.</p>
+      ) : null}
 
       <FormError>{error}</FormError>
 
-      {!evacuation.completed_at ? (
-        <Button size="lg" className="mt-4 w-full" disabled={busy || !hasFinalPhoto} onClick={complete}>
+      {!completed ? (
+        <Button size="lg" className="mt-4 w-full" disabled={busy || !finalPhoto} onClick={complete}>
           Mark evacuation complete
         </Button>
       ) : null}
@@ -160,6 +161,7 @@ function ChargeSection({
   rates: AcChargeRate[];
 }) {
   const router = useRouter();
+  const ops = useOutboxOps();
   const [factory, setFactory] = useState(charge.factory_charge_kg?.toString() ?? "");
   const [allowance, setAllowance] = useState(charge.factory_pipe_allowance_m?.toString() ?? "");
   const [installed, setInstalled] = useState(charge.installed_pipe_length_m?.toString() ?? "");
@@ -185,6 +187,11 @@ function ChargeSection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const chargeWaiting = waitingOps(ops, system.id).some((o) => o.spec.kind === "charge");
+  const totalKg = chargeWaiting
+    ? (Number(factory) || 0) + (Number(actualAdditional) || 0)
+    : charge.total_charge_kg;
+
   const diff =
     installed && allowance ? (Number(installed) - Number(allowance)).toFixed(2) : null;
 
@@ -193,31 +200,40 @@ function ChargeSection({
     0,
   );
 
-  const saveField = async (overrides: Partial<Parameters<typeof updateAcChargeAction>[0]> = {}) => {
+  const saveField = async (overrides: Partial<Extract<OpSpec, { kind: "charge" }>["input"]> = {}) => {
     setBusy(true);
     setError(null);
-    const res = await updateAcChargeAction({
-      acSystemId: system.id,
-      factoryChargeKg: factory ? Number(factory) : null,
-      factoryPipeAllowanceM: allowance ? Number(allowance) : null,
-      installedPipeLengthM: installed ? Number(installed) : null,
-      actualAdditionalKg: actualAdditional ? Number(actualAdditional) : null,
-      ...overrides,
+    const res = await outbox.enqueue({
+      kind: "charge",
+      lane: `charge:${system.id}`,
+      scope: system.id,
+      input: {
+        acSystemId: system.id,
+        factoryChargeKg: factory ? Number(factory) : null,
+        factoryPipeAllowanceM: allowance ? Number(allowance) : null,
+        installedPipeLengthM: installed ? Number(installed) : null,
+        actualAdditionalKg: actualAdditional ? Number(actualAdditional) : null,
+        ...overrides,
+      },
     });
     setBusy(false);
-    if (res.error) setError(res.error);
-    else router.refresh();
+    if (res.status === "error") setError(res.error);
+    else if (res.status === "done") router.refresh();
   };
 
   const saveLine = async (pipeSize: string, next: { length: string; rate: string; overridden: boolean }) => {
-    const res = await upsertAcChargeCalcLineAction({
-      acSystemId: system.id,
-      pipeSize,
-      lengthM: Number(next.length) || 0,
-      rateKgPerM: next.rate ? Number(next.rate) : null,
-      overridden: next.overridden,
-    });
-    if (res.error) setError(res.error);
+    try {
+      const res = await upsertAcChargeCalcLineAction({
+        acSystemId: system.id,
+        pipeSize,
+        lengthM: Number(next.length) || 0,
+        rateKgPerM: next.rate ? Number(next.rate) : null,
+        overridden: next.overridden,
+      });
+      if (res.error) setError(res.error);
+    } catch {
+      setError(OFFLINE_MESSAGE);
+    }
   };
 
   const useCalculatedTotal = () => {
@@ -329,7 +345,10 @@ function ChargeSection({
 
       <div className="mt-5 rounded-xl bg-canvas p-3.5">
         <p className="text-[13px] text-muted">Total system charge</p>
-        <p className="text-[20px] font-semibold">{charge.total_charge_kg.toFixed(2)} kg</p>
+        <p className="text-[20px] font-semibold">{totalKg.toFixed(2)} kg</p>
+        {chargeWaiting ? (
+          <p className="mt-0.5 text-[12px] font-medium text-progress">Saved on this phone — waiting to send.</p>
+        ) : null}
       </div>
 
       <FormError>{error}</FormError>

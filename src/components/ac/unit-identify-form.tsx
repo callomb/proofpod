@@ -3,31 +3,13 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/client";
-import {
-  extractDataPlateAction,
-  lookupTagrefAssetAction,
-  recordAcPhotoAction,
-  updateAcUnitAction,
-} from "@/lib/ac/actions";
+import { extractDataPlateAction, lookupTagrefAssetAction } from "@/lib/ac/actions";
+import { outbox } from "@/lib/ac/outbox";
+import { queuePhoto } from "@/lib/ac/outbox/photo";
 import { assetNumberFromScan } from "@/lib/ac/domain";
 import type { AcUnit } from "@/lib/ac/types";
 import { Button, Card, Field, FormError, Muted, inputClass } from "../ui";
 import { QrScanButton } from "./qr-scanner";
-
-async function uploadEvidence(
-  file: File,
-  opts: { companyId: string; projectId: string; acSystemId: string },
-): Promise<{ path: string; mime: string }> {
-  const supabase = createClient();
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const path = `${opts.companyId}/${opts.projectId}/${opts.acSystemId}/${crypto.randomUUID()}.${ext || "jpg"}`;
-  const { error } = await supabase.storage
-    .from("evidence")
-    .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
-  if (error) throw new Error(error.message);
-  return { path, mime: file.type || "image/jpeg" };
-}
 
 export function UnitIdentifyForm({
   unit,
@@ -65,18 +47,23 @@ export function UnitIdentifyForm({
   const onScan = async (raw: string) => {
     setAssetNumber(assetNumberFromScan(raw));
     setTagNote(null);
-    const found = await lookupTagrefAssetAction(raw);
-    if (!found) return;
-    const filled: string[] = [];
-    if (found.reference && showReference) {
-      setReference(found.reference);
-      filled.push("reference");
+    try {
+      const found = await lookupTagrefAssetAction(raw);
+      if (!found) return;
+      const filled: string[] = [];
+      if (found.reference && showReference) {
+        setReference(found.reference);
+        filled.push("reference");
+      }
+      if (found.area && showLocation) {
+        setLocation(found.area);
+        filled.push("location");
+      }
+      if (filled.length) setTagNote(`Filled the ${filled.join(" and ")} from the label — check before saving.`);
+    } catch {
+      // No signal: the asset number is still captured; the rest is typed by hand.
+      setTagNote("No signal to look up the label — enter the reference and location by hand.");
     }
-    if (found.area && showLocation) {
-      setLocation(found.area);
-      filled.push("location");
-    }
-    if (filled.length) setTagNote(`Filled the ${filled.join(" and ")} from the label — check before saving.`);
   };
 
   const onDataPlateFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,26 +74,36 @@ export function UnitIdentifyForm({
     setError(null);
     setOcrNote(null);
     try {
-      const { path, mime } = await uploadEvidence(file, { companyId, projectId, acSystemId });
-      const rec = await recordAcPhotoAction({
-        acSystemId,
-        acUnitId: unit.id,
-        storagePath: path,
-        subject: role === "outdoor" ? "outdoor_data_plate" : "indoor_data_plate",
-        mime: file.type,
-        sizeBytes: file.size,
+      const photo = await queuePhoto(file, {
+        companyId,
+        projectId,
+        folderId: acSystemId,
+        lane: `unit:${unit.id}`,
+        scope: acSystemId,
+        record: {
+          subject: role === "outdoor" ? "outdoor_data_plate" : "indoor_data_plate",
+          acSystemId,
+          acUnitId: unit.id,
+        },
       });
-      if (rec.error) throw new Error(rec.error);
+      if (photo.status === "error") throw new Error(photo.error);
+      if (photo.status === "queued") {
+        setOcrNote("No signal — photo saved on this phone and will upload later. Enter the details below by hand.");
+        return;
+      }
 
-      const extracted = await extractDataPlateAction(unit.id, path, mime);
-      if (extracted.error) throw new Error(extracted.error);
-      if (extracted.model || extracted.serial || extracted.manufactureDate) {
-        if (extracted.model) setModelNumber(extracted.model);
-        if (extracted.serial) setSerialNumber(extracted.serial);
-        if (extracted.manufactureDate) setManufactureDate(extracted.manufactureDate);
-        setOcrNote("Suggested from the photo — check and correct before saving.");
-      } else {
-        setOcrNote("Photo saved. Couldn't read the model/serial automatically — enter them below.");
+      try {
+        const extracted = await extractDataPlateAction(unit.id, photo.path, file.type);
+        if (extracted.model || extracted.serial || extracted.manufactureDate) {
+          if (extracted.model) setModelNumber(extracted.model);
+          if (extracted.serial) setSerialNumber(extracted.serial);
+          if (extracted.manufactureDate) setManufactureDate(extracted.manufactureDate);
+          setOcrNote("Suggested from the photo — check and correct before saving.");
+        } else {
+          setOcrNote("Photo saved. Couldn't read the model/serial automatically — enter them below.");
+        }
+      } catch {
+        setOcrNote("Photo saved. Couldn't read it without signal — enter the details below by hand.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -118,18 +115,30 @@ export function UnitIdentifyForm({
   const save = async () => {
     setSaveBusy(true);
     setError(null);
-    const res = await updateAcUnitAction({
-      unitId: unit.id,
-      reference: showReference ? reference : undefined,
-      location: showLocation ? location : undefined,
-      assetNumber: assetNumberFromScan(assetNumber),
-      modelNumber,
-      serialNumber,
-      manufactureDate,
+    const res = await outbox.enqueue({
+      kind: "unit",
+      lane: `unit:${unit.id}`,
+      scope: acSystemId,
+      input: {
+        unitId: unit.id,
+        reference: showReference ? reference : undefined,
+        location: showLocation ? location : undefined,
+        assetNumber: assetNumberFromScan(assetNumber),
+        modelNumber,
+        serialNumber,
+        manufactureDate,
+      },
     });
     setSaveBusy(false);
-    if (res.error) setError(res.error);
-    else router.push(`/projects/${projectId}/ac/${acSystemId}`);
+    if (res.status === "error") {
+      setError(res.error);
+      return;
+    }
+    if (res.status === "queued" && !navigator.onLine) {
+      setOcrNote("Saved on this phone. It will send when signal returns — you can go back to the system then.");
+      return;
+    }
+    router.push(`/projects/${projectId}/ac/${acSystemId}`);
   };
 
   return (

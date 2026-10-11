@@ -3,30 +3,12 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/client";
-import {
-  completeAcPressureTestStageAction,
-  createAcPressureTestAttemptAction,
-  recordAcPhotoAction,
-  setAcPressureTestResultAction,
-  startAcPressureTestStageAction,
-} from "@/lib/ac/actions";
+import { createAcPressureTestAttemptAction } from "@/lib/ac/actions";
+import { outbox } from "@/lib/ac/outbox";
+import { appliedOps, useOutboxOps } from "@/lib/ac/outbox/hooks";
+import { OFFLINE_MESSAGE, queuePhoto } from "@/lib/ac/outbox/photo";
 import type { AcPhoto, AcPressureTest, AcPressureTestStage } from "@/lib/ac/types";
 import { Button, Card, FormError, LinkButton, Muted, StatusDot } from "../ui";
-
-async function uploadEvidence(
-  file: File,
-  opts: { companyId: string; projectId: string; folderId: string },
-): Promise<string> {
-  const supabase = createClient();
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const path = `${opts.companyId}/${opts.projectId}/${opts.folderId}/${crypto.randomUUID()}.${ext || "jpg"}`;
-  const { error } = await supabase.storage
-    .from("evidence")
-    .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
-  if (error) throw new Error(error.message);
-  return path;
-}
 
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString("en-GB", {
@@ -62,6 +44,8 @@ function StageRow({
   memberNames,
   locked,
   busy,
+  waiting,
+  photoWaiting,
   onStart,
   onComplete,
 }: {
@@ -71,6 +55,8 @@ function StageRow({
   memberNames: Record<string, string>;
   locked: boolean;
   busy: boolean;
+  waiting: boolean;
+  photoWaiting: boolean;
   onStart: () => void;
   onComplete: () => void;
 }) {
@@ -90,6 +76,11 @@ function StageRow({
           {stage.status === "complete" &&
             `Completed ${stage.completed_at ? fmtDateTime(stage.completed_at) : ""}${stage.completed_by ? ` · ${memberNames[stage.completed_by] ?? "Someone"}` : ""}`}
         </p>
+        {waiting || photoWaiting ? (
+          <p className="mt-0.5 text-[12px] font-medium text-progress">
+            {photoWaiting ? "Photo saved on this phone" : "Saved on this phone"} · waiting to send
+          </p>
+        ) : null}
         {startPhoto || endPhoto ? (
           <div className="mt-2 flex gap-2">
             <PhotoThumb url={startPhoto ? (photoUrls[startPhoto.storage_path] ?? null) : null} label={`Stage ${stage.stage_no} start`} />
@@ -145,6 +136,7 @@ export function PressureTestPanel({
   doneLabel: string;
 }) {
   const router = useRouter();
+  const ops = useOutboxOps();
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<{ stageId: string; stageNo: number; action: "start" | "complete" } | null>(null);
 
@@ -153,11 +145,52 @@ export function PressureTestPanel({
   const [retestBusy, setRetestBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const current = attempts[0];
+  const scope = acSystemId ?? folderId;
+
+  // What the engineer has already done on this phone counts as done here, even
+  // before it has been sent.
+  const serverCurrent = attempts[0];
+  const resultOp = appliedOps(ops, "pressureResult")
+    .filter((o) => o.spec.attemptId === serverCurrent?.id)
+    .at(-1);
+  const current = serverCurrent
+    ? resultOp
+      ? { ...serverCurrent, status: resultOp.spec.result, locked: resultOp.spec.result === "passed" }
+      : serverCurrent
+    : undefined;
   const history = attempts.slice(1);
+  const stageOps = appliedOps(ops, "stage");
+  const photoOps = appliedOps(ops, "photo");
   const currentStages = stages
     .filter((s) => s.ac_pressure_test_id === current?.id)
-    .sort((a, b) => a.stage_no - b.stage_no);
+    .sort((a, b) => a.stage_no - b.stage_no)
+    .map((stage) => {
+      let eff = stage;
+      let waiting = false;
+      for (const op of stageOps.filter((o) => o.spec.stageId === stage.id)) {
+        if (op.spec.action === "start") {
+          if (eff.status === "not_started") eff = { ...eff, status: "in_progress", started_at: op.capturedAt };
+        } else {
+          eff = {
+            ...eff,
+            status: "complete",
+            started_at: eff.started_at ?? op.capturedAt,
+            completed_at: op.capturedAt,
+          };
+        }
+        if (op.status !== "synced") waiting = true;
+      }
+      const photoWaiting = photoOps.some(
+        (o) =>
+          o.status !== "synced" &&
+          o.spec.record.acPressureTestId === current?.id &&
+          o.spec.record.stageNo === stage.stage_no,
+      );
+      return { stage: eff, waiting, photoWaiting };
+    });
+
+  const sendStage = async (stageId: string, action: "start" | "complete") =>
+    outbox.enqueue({ kind: "stage", lane: `stage:${stageId}`, scope, stageId, action });
 
   const runStage = async (stageId: string, action: "start" | "complete", requiresPhoto: boolean, stageNo: number) => {
     if (requiresPhoto) {
@@ -167,42 +200,40 @@ export function PressureTestPanel({
     }
     setBusyStageId(stageId);
     setError(null);
-    const res =
-      action === "start"
-        ? await startAcPressureTestStageAction(stageId)
-        : await completeAcPressureTestStageAction(stageId);
+    const res = await sendStage(stageId, action);
     setBusyStageId(null);
-    if (res.error) setError(res.error);
-    else router.refresh();
+    if (res.status === "error") setError(res.error);
+    else if (res.status === "done") router.refresh();
   };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     const job = pending.current;
-    if (!file || !job) return;
+    if (!file || !job || !current) return;
     setBusyStageId(job.stageId);
     setError(null);
     try {
-      const path = await uploadEvidence(file, { companyId, projectId, folderId });
-      const rec = await recordAcPhotoAction({
-        acSystemId,
-        projectId: acSystemId ? undefined : projectId,
-        acPressureTestId: current.id,
-        stageNo: job.stageNo,
-        storagePath: path,
-        subject: job.action === "start" ? "pressure_start" : "pressure_end",
-        mime: file.type,
-        sizeBytes: file.size,
+      // Photo first, then the time — so the two stay linked even with no signal.
+      const photoRes = await queuePhoto(file, {
+        companyId,
+        projectId,
+        folderId,
+        lane: `stage:${job.stageId}`,
+        scope,
+        record: {
+          subject: job.action === "start" ? "pressure_start" : "pressure_end",
+          acSystemId,
+          projectId: acSystemId ? undefined : projectId,
+          acPressureTestId: current.id,
+          stageNo: job.stageNo,
+        },
       });
-      if (rec.error) throw new Error(rec.error);
+      if (photoRes.status === "error") throw new Error(photoRes.error);
 
-      const res =
-        job.action === "start"
-          ? await startAcPressureTestStageAction(job.stageId)
-          : await completeAcPressureTestStageAction(job.stageId);
-      if (res.error) throw new Error(res.error);
-      router.refresh();
+      const stageRes = await sendStage(job.stageId, job.action);
+      if (stageRes.status === "error") throw new Error(stageRes.error);
+      if (photoRes.status === "done" && stageRes.status === "done") router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -215,23 +246,34 @@ export function PressureTestPanel({
     if (!current) return;
     setResultBusy(true);
     setError(null);
-    const res = await setAcPressureTestResultAction(current.id, result);
+    const res = await outbox.enqueue({
+      kind: "pressureResult",
+      lane: `result:${current.id}`,
+      scope,
+      attemptId: current.id,
+      result,
+    });
     setResultBusy(false);
-    if (res.error) setError(res.error);
-    else router.refresh();
+    if (res.status === "error") setError(res.error);
+    else if (res.status === "done") router.refresh();
   };
 
   const startNew = async () => {
     setRetestBusy(true);
     setError(null);
-    const res = await createAcPressureTestAttemptAction({
-      acSystemId,
-      projectId: acSystemId ? undefined : projectId,
-      retestOf: current?.status === "failed" ? current.id : null,
-    });
-    setRetestBusy(false);
-    if (res.error) setError(res.error);
-    else router.refresh();
+    try {
+      const res = await createAcPressureTestAttemptAction({
+        acSystemId,
+        projectId: acSystemId ? undefined : projectId,
+        retestOf: current?.status === "failed" ? current.id : null,
+      });
+      if (res.error) setError(res.error);
+      else router.refresh();
+    } catch {
+      setError(OFFLINE_MESSAGE);
+    } finally {
+      setRetestBusy(false);
+    }
   };
 
   if (!current) {
@@ -248,7 +290,7 @@ export function PressureTestPanel({
     );
   }
 
-  const allComplete = currentStages.every((s) => s.status === "complete");
+  const allComplete = currentStages.every(({ stage }) => stage.status === "complete");
 
   return (
     <div className="space-y-4">
@@ -265,10 +307,12 @@ export function PressureTestPanel({
           ) : null}
         </div>
         <div>
-          {currentStages.map((stage) => (
+          {currentStages.map(({ stage, waiting, photoWaiting }) => (
             <StageRow
               key={stage.id}
               stage={stage}
+              waiting={waiting}
+              photoWaiting={photoWaiting}
               photos={photos.filter((p) => p.ac_pressure_test_id === current.id)}
               photoUrls={photoUrls}
               memberNames={memberNames}

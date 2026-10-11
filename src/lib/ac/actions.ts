@@ -191,17 +191,23 @@ export async function createAcPressureTestAttemptAction(input: {
   return { ok: true, id: row.id, lineageId: row.lineage_id };
 }
 
-export async function startAcPressureTestStageAction(stageId: string): Promise<ActionResult> {
+export async function startAcPressureTestStageAction(stageId: string, capturedAt?: string | null): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("start_ac_pressure_test_stage", { p_stage_id: stageId });
+  const { error } = await supabase.rpc("start_ac_pressure_test_stage", {
+    p_stage_id: stageId,
+    p_at: capturedAt ?? null,
+  });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
-export async function completeAcPressureTestStageAction(stageId: string): Promise<ActionResult> {
+export async function completeAcPressureTestStageAction(stageId: string, capturedAt?: string | null): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("complete_ac_pressure_test_stage", { p_stage_id: stageId });
+  const { error } = await supabase.rpc("complete_ac_pressure_test_stage", {
+    p_stage_id: stageId,
+    p_at: capturedAt ?? null,
+  });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
@@ -210,11 +216,13 @@ export async function completeAcPressureTestStageAction(stageId: string): Promis
 export async function setAcPressureTestResultAction(
   attemptId: string,
   result: "passed" | "failed",
+  capturedAt?: string | null,
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_ac_pressure_test_result", {
     p_attempt_id: attemptId,
     p_result: result,
+    p_at: capturedAt ?? null,
   });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
@@ -238,9 +246,12 @@ export async function saveAcEvacuationChecklistAction(
   return { ok: true };
 }
 
-export async function completeAcEvacuationAction(acSystemId: string): Promise<ActionResult> {
+export async function completeAcEvacuationAction(acSystemId: string, capturedAt?: string | null): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("complete_ac_evacuation", { p_ac_system_id: acSystemId });
+  const { error } = await supabase.rpc("complete_ac_evacuation", {
+    p_ac_system_id: acSystemId,
+    p_at: capturedAt ?? null,
+  });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
@@ -345,6 +356,7 @@ export async function upsertAcTemperatureReadingAction(input: {
   mode: "cooling" | "heating";
   airOnC?: number | null;
   airOffC?: number | null;
+  capturedAt?: string | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("upsert_ac_temperature_reading", {
@@ -352,6 +364,7 @@ export async function upsertAcTemperatureReadingAction(input: {
     p_mode: input.mode,
     p_air_on_c: input.airOnC ?? null,
     p_air_off_c: input.airOffC ?? null,
+    p_at: input.capturedAt ?? null,
   });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
@@ -368,6 +381,7 @@ export async function createAcDrainTestAction(input: {
   pumpModel?: string | null;
   waterAddedLitres?: number | null;
   notes?: string | null;
+  capturedAt?: string | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("create_ac_drain_test", {
@@ -377,6 +391,7 @@ export async function createAcDrainTestAction(input: {
     p_pump_model: input.pumpModel ?? null,
     p_water_added_litres: input.waterAddedLitres ?? null,
     p_notes: input.notes ?? null,
+    p_at: input.capturedAt ?? null,
   });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
@@ -415,6 +430,7 @@ export async function recordAcPhotoAction(input: {
   stageNo?: number | null;
   mime?: string | null;
   sizeBytes?: number | null;
+  takenAt?: string | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("record_ac_photo", {
@@ -427,6 +443,7 @@ export async function recordAcPhotoAction(input: {
     p_stage_no: input.stageNo ?? null,
     p_mime: input.mime ?? null,
     p_size_bytes: input.sizeBytes ?? null,
+    p_taken_at: input.takenAt ?? null,
   });
   if (error) return { error: error.message };
   return { ok: true };

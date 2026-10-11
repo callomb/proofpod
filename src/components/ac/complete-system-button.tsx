@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { completeAcSystemAction } from "@/lib/ac/actions";
-import { Button, Field, FormError, inputClass } from "../ui";
+import { useOutboxOps, waitingOps } from "@/lib/ac/outbox/hooks";
+import { OFFLINE_MESSAGE } from "@/lib/ac/outbox/photo";
+import { Button, Field, FormError, Muted, inputClass } from "../ui";
 import { SignaturePad } from "./signature-pad";
 
 async function uploadSignature(
@@ -33,6 +35,8 @@ export function CompleteSystemButton({
   projectId: string;
 }) {
   const router = useRouter();
+  const ops = useOutboxOps();
+  const waiting = waitingOps(ops, acSystemId);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +45,22 @@ export function CompleteSystemButton({
   const [witnessed, setWitnessed] = useState(false);
   const [witnessName, setWitnessName] = useState("");
   const [witnessSignature, setWitnessSignature] = useState<Blob | null>(null);
+
+  if (waiting.length > 0) {
+    // The server checks everything is recorded before locking the system, so
+    // anything still on this phone has to arrive first.
+    return (
+      <div>
+        <Button size="lg" className="w-full" disabled>
+          Complete system
+        </Button>
+        <Muted className="mt-2 block text-center">
+          {waiting.length} change{waiting.length === 1 ? "" : "s"} still waiting to send. You can complete once
+          they&apos;ve gone through.
+        </Muted>
+      </div>
+    );
+  }
 
   if (!confirming) {
     return (
@@ -71,7 +91,13 @@ export function CompleteSystemButton({
       if (res.error) throw new Error(res.error);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not complete the system");
+      setError(
+        !navigator.onLine || (err instanceof TypeError)
+          ? OFFLINE_MESSAGE
+          : err instanceof Error
+            ? err.message
+            : "Could not complete the system",
+      );
     } finally {
       setBusy(false);
     }

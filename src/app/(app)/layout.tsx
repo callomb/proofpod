@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AppHeader, BottomNav } from "@/components/app-shell";
+import { OutboxStatus } from "@/components/ac/outbox-status";
 import { Screen } from "@/components/ui";
 import { getWorkspace } from "@/lib/data";
 import { initials } from "@/lib/domain";
@@ -13,6 +14,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <AppHeader initials={initials(profile.full_name)} />
         {children}
       </Screen>
+      <OutboxStatus />
       <BottomNav />
     </>
   );

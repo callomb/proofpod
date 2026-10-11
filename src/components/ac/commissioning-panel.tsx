@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { updateAcCommissioningAction, upsertAcTemperatureReadingAction } from "@/lib/ac/actions";
+import type { updateAcCommissioningAction } from "@/lib/ac/actions";
+import { outbox } from "@/lib/ac/outbox";
+import type { EnqueueResult } from "@/lib/ac/outbox/types";
 import type { AcCommissioning, AcTemperatureReading, AcUnit } from "@/lib/ac/types";
 import { Button, Card, FormError, Muted, inputClass } from "../ui";
-
-type Fields = Parameters<typeof updateAcCommissioningAction>[1];
 
 function Checkbox({
   label,
@@ -91,12 +91,30 @@ export function CommissioningPanel({
   const [error, setError] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
 
-  // Checkboxes save immediately (a click is a reliable, unambiguous commit).
-  const saveCheck = async (fields: Fields) => {
+  // Checkboxes save immediately (a click is a reliable, unambiguous commit) and
+  // show as ticked straight away, even with no signal.
+  const [checks, setChecks] = useState({
+    transitBracketsRemoved: !!commissioning.transit_brackets_removed,
+    electricalConnectionsTight: !!commissioning.electrical_connections_tight,
+    localIsolatorFitted: !!commissioning.local_isolator_fitted,
+    equipmentLabelled: !!commissioning.equipment_labelled,
+    coversFixedClean: !!commissioning.covers_fixed_clean,
+    functionalTestSatisfactory: !!commissioning.functional_test_satisfactory,
+  });
+  const saveCheck = async (key: keyof typeof checks, value: boolean) => {
     setError(null);
-    const res = await updateAcCommissioningAction(acSystemId, fields);
-    if (res.error) setError(res.error);
-    else router.refresh();
+    setChecks((c) => ({ ...c, [key]: value }));
+    const res = await outbox.enqueue({
+      kind: "commissioning",
+      lane: `comm:${acSystemId}`,
+      scope: acSystemId,
+      acSystemId,
+      fields: { [key]: value },
+    });
+    if (res.status === "error") {
+      setChecks((c) => ({ ...c, [key]: !value }));
+      setError(res.error);
+    }
   };
 
   // Everything else is typed then committed together with one explicit Save —
@@ -140,52 +158,67 @@ export function CommissioningPanel({
 
   // One Save for the whole page. Temperature readings are only sent when
   // changed, so re-saving doesn't re-stamp who/when for untouched readings.
+  const [savedNote, setSavedNote] = useState<string | null>(null);
   const saveAll = async () => {
     setSaveBusy(true);
     setError(null);
-    const tempCalls = indoorUnits.flatMap((u) => {
+    setSavedNote(null);
+    const results: EnqueueResult[] = [];
+    for (const u of indoorUnits) {
       const cur = temps[u.id];
       const was = savedTemps[u.id];
-      const calls = [];
       if (cur.coolOn !== was.coolOn || cur.coolOff !== was.coolOff) {
-        calls.push(
-          upsertAcTemperatureReadingAction({
-            acUnitId: u.id,
-            mode: "cooling",
-            airOnC: num(cur.coolOn),
-            airOffC: num(cur.coolOff),
+        results.push(
+          await outbox.enqueue({
+            kind: "temperature",
+            lane: `temp:${u.id}`,
+            scope: acSystemId,
+            input: { acUnitId: u.id, mode: "cooling", airOnC: num(cur.coolOn), airOffC: num(cur.coolOff) },
           }),
         );
       }
       if (cur.heatOn !== was.heatOn || cur.heatOff !== was.heatOff) {
-        calls.push(
-          upsertAcTemperatureReadingAction({
-            acUnitId: u.id,
-            mode: "heating",
-            airOnC: num(cur.heatOn),
-            airOffC: num(cur.heatOff),
+        results.push(
+          await outbox.enqueue({
+            kind: "temperature",
+            lane: `temp:${u.id}`,
+            scope: acSystemId,
+            input: { acUnitId: u.id, mode: "heating", airOnC: num(cur.heatOn), airOffC: num(cur.heatOff) },
           }),
         );
       }
-      return calls;
-    });
-    const tempResults = await Promise.all(tempCalls);
-    const res = await updateAcCommissioningAction(acSystemId, {
-      mcbFuseSpec: form.mcb,
-      outdoorNameplateFlcAmps: num(form.flc),
-      suctionPipeSize: form.suction,
-      liquidPipeSize: form.liquid,
-      currentCoolingL1: num(form.coolingL1),
-      currentCoolingL2: num(form.coolingL2),
-      currentCoolingL3: num(form.coolingL3),
-      currentHeatingL1: num(form.heatingL1),
-      currentHeatingL2: num(form.heatingL2),
-      currentHeatingL3: num(form.heatingL3),
-    });
+    }
+    results.push(
+      await outbox.enqueue({
+        kind: "commissioning",
+        lane: `comm:${acSystemId}`,
+        scope: acSystemId,
+        acSystemId,
+        fields: {
+          mcbFuseSpec: form.mcb,
+          outdoorNameplateFlcAmps: num(form.flc),
+          suctionPipeSize: form.suction,
+          liquidPipeSize: form.liquid,
+          currentCoolingL1: num(form.coolingL1),
+          currentCoolingL2: num(form.coolingL2),
+          currentCoolingL3: num(form.coolingL3),
+          currentHeatingL1: num(form.heatingL1),
+          currentHeatingL2: num(form.heatingL2),
+          currentHeatingL3: num(form.heatingL3),
+        } satisfies Parameters<typeof updateAcCommissioningAction>[1],
+      }),
+    );
     setSaveBusy(false);
-    const failed = tempResults.find((r) => r.error) ?? (res.error ? res : undefined);
-    if (failed) {
-      setError(failed.error!);
+
+    const failed = results.find((r) => r.status === "error");
+    if (failed && failed.status === "error") {
+      setError(failed.error);
+      return;
+    }
+    const queued = results.some((r) => r.status === "queued");
+    if (queued && !navigator.onLine) {
+      // The next screen can't load without signal, so stay here; it sends by itself.
+      setSavedNote("Saved on this phone. It will send when signal returns — you can go back to the system then.");
       return;
     }
     router.push(`/projects/${projectId}/ac/${acSystemId}`);
@@ -198,33 +231,33 @@ export function CommissioningPanel({
         <div className="space-y-2.5">
           <Checkbox
             label="Transit brackets removed"
-            checked={!!commissioning.transit_brackets_removed}
-            onChange={(v) => saveCheck({ transitBracketsRemoved: v })}
+            checked={checks.transitBracketsRemoved}
+            onChange={(v) => saveCheck("transitBracketsRemoved", v)}
           />
           <Checkbox
             label="Electrical / fly-lead connections tight"
-            checked={!!commissioning.electrical_connections_tight}
-            onChange={(v) => saveCheck({ electricalConnectionsTight: v })}
+            checked={checks.electricalConnectionsTight}
+            onChange={(v) => saveCheck("electricalConnectionsTight", v)}
           />
           <Checkbox
             label="Local isolator fitted"
-            checked={!!commissioning.local_isolator_fitted}
-            onChange={(v) => saveCheck({ localIsolatorFitted: v })}
+            checked={checks.localIsolatorFitted}
+            onChange={(v) => saveCheck("localIsolatorFitted", v)}
           />
           <Checkbox
             label="Equipment labelled"
-            checked={!!commissioning.equipment_labelled}
-            onChange={(v) => saveCheck({ equipmentLabelled: v })}
+            checked={checks.equipmentLabelled}
+            onChange={(v) => saveCheck("equipmentLabelled", v)}
           />
           <Checkbox
             label="Covers fixed and clean"
-            checked={!!commissioning.covers_fixed_clean}
-            onChange={(v) => saveCheck({ coversFixedClean: v })}
+            checked={checks.coversFixedClean}
+            onChange={(v) => saveCheck("coversFixedClean", v)}
           />
           <Checkbox
             label="Functional test satisfactory"
-            checked={!!commissioning.functional_test_satisfactory}
-            onChange={(v) => saveCheck({ functionalTestSatisfactory: v })}
+            checked={checks.functionalTestSatisfactory}
+            onChange={(v) => saveCheck("functionalTestSatisfactory", v)}
           />
         </div>
       </Card>
@@ -278,6 +311,7 @@ export function CommissioningPanel({
       ))}
 
       <FormError>{error}</FormError>
+      {savedNote ? <p className="text-center text-[13px] font-medium text-progress">{savedNote}</p> : null}
       <Button size="lg" className="w-full" disabled={saveBusy} onClick={saveAll}>
         {saveBusy ? "Saving…" : `Save — back to ${systemRef}`}
       </Button>
