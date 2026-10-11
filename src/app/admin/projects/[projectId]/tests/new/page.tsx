@@ -21,7 +21,7 @@ export default async function AdminNewTestTypePage(
       <h1 className="mb-6 text-[24px] font-semibold tracking-tight">New test</h1>
 
       <Link href={`/admin/projects/${projectId}/tests/new/pressure`}>
-        <Card className="flex items-center justify-between p-4 active:bg-canvas hover:bg-canvas">
+        <Card className="flex items-center justify-between p-4 active:bg-line hover:bg-canvas">
           <div>
             <p className="text-[15px] font-semibold">Pressure Test</p>
             <p className="mt-0.5 text-[13px] text-muted">Stage pressures, evidence, pass/fail</p>

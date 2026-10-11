@@ -16,7 +16,7 @@ function Tile({ href, label, hint }: { href: string | null; label: string; hint?
   const card = (
     <Card
       className={`flex items-center justify-between p-4 ${
-        href ? "active:bg-canvas hover:bg-canvas" : "opacity-50"
+        href ? "active:bg-line hover:bg-canvas" : "opacity-50"
       }`}
     >
       <div>

@@ -45,7 +45,7 @@ function CountBits({ p }: { p: ProjectOverview }) {
 export function ProjectCard({ p }: { p: ProjectOverview }) {
   return (
     <Link href={`/projects/${p.id}`} className="block">
-      <Card className="px-4 py-4 transition-colors active:bg-canvas">
+      <Card className="px-4 py-4 transition-colors active:bg-line">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-[17px] font-semibold">{p.name}</p>

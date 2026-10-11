@@ -39,7 +39,7 @@ function LinkRow({
 }) {
   return (
     <Link href={href}>
-      <Card className="flex items-center justify-between p-4">
+      <Card className="flex items-center justify-between p-4 transition-colors active:bg-line">
         <div className="min-w-0">
           <p className="text-[14px] font-medium">{title}</p>
           <p className="mt-0.5 text-[12px] text-muted">{hint}</p>
@@ -81,7 +81,7 @@ function UnitRow({ projectId, system, unit, title }: { projectId: string; system
   const identified = unitIdentified(unit);
   return (
     <Link href={`/projects/${projectId}/ac/${system.id}/units/${unit.id}`}>
-      <Card className="flex items-center justify-between p-4">
+      <Card className="flex items-center justify-between p-4 transition-colors active:bg-line">
         <div className="min-w-0">
           <p className="text-[14px] font-medium">{title}</p>
           <p className="mt-0.5 truncate text-[12px] text-muted">

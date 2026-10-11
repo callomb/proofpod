@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { Wordmark } from "./wordmark";
 
@@ -48,6 +48,13 @@ function TabIcon({ name }: { name: "home" | "more" }) {
 
 export function BottomNav() {
   const pathname = usePathname();
+  // iOS Safari only shows :active (pressed) styles once the page has a touch
+  // listener, so register a harmless one.
+  useEffect(() => {
+    const noop = () => {};
+    document.addEventListener("touchstart", noop, { passive: true });
+    return () => document.removeEventListener("touchstart", noop);
+  }, []);
   const items = [
     { href: "/home", label: "Home", name: "home" as const },
     { href: "/more", label: "More", name: "more" as const },
@@ -65,7 +72,7 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 rounded-lg px-6 py-1.5 text-[11px] font-medium ${
+              className={`flex flex-col items-center gap-1 rounded-lg px-6 py-1.5 text-[11px] font-medium transition-opacity active:opacity-50 ${
                 active ? "text-ink" : "text-faint"
               }`}
             >

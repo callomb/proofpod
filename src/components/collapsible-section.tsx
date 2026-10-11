@@ -19,7 +19,7 @@ export function CollapsibleSection({
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between py-3 text-left"
+        className="flex w-full items-center justify-between py-3 text-left transition-opacity active:opacity-50"
       >
         <span className="flex items-baseline gap-2">
           <span className="text-[13px] font-semibold uppercase tracking-wide text-ink-soft">

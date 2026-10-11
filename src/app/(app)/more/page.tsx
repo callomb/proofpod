@@ -31,7 +31,7 @@ export default async function MorePage() {
       {isAdmin ? (
         <Link
           href="/admin/projects"
-          className="mb-6 flex items-center justify-between rounded-card border border-line bg-paper px-4 py-3.5 text-[15px] font-medium active:bg-canvas"
+          className="mb-6 flex items-center justify-between rounded-card border border-line bg-paper px-4 py-3.5 text-[15px] font-medium active:bg-line"
         >
           Open the admin portal
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-faint" aria-hidden>

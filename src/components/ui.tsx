@@ -64,13 +64,13 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none select-none";
+  "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[color,background-color,transform] duration-100 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none select-none";
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-ink text-paper hover:bg-ink-soft",
-  secondary: "border border-line-strong bg-paper text-ink hover:bg-canvas",
-  ghost: "text-ink hover:bg-canvas",
-  danger: "border border-fail/30 bg-fail-soft text-fail hover:bg-fail/10",
+  primary: "bg-ink text-paper hover:bg-ink-soft active:bg-[#4a4a4a]",
+  secondary: "border border-line-strong bg-paper text-ink hover:bg-canvas active:bg-line",
+  ghost: "text-ink hover:bg-canvas active:bg-line",
+  danger: "border border-fail/30 bg-fail-soft text-fail hover:bg-fail/10 active:bg-fail/20",
 };
 
 const BUTTON_SIZE = {

@@ -9,7 +9,7 @@ export function AcSystemRow({ system, projectId }: { system: AcSystem; projectId
   return (
     <Link
       href={`/projects/${projectId}/ac/${system.id}`}
-      className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3.5 py-3 active:bg-canvas hover:bg-canvas"
+      className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3.5 py-3 active:bg-line hover:bg-canvas"
     >
       <div className="min-w-0">
         <p className="truncate text-[14px] font-medium">{system.system_ref}</p>
