@@ -17,16 +17,19 @@ export default async function AcPressureTestPage(
   props: PageProps<"/projects/[projectId]/ac/[systemId]/pressure-test">,
 ) {
   const { projectId, systemId } = await props.params;
-  const [system, { memberNames }] = await Promise.all([getAcSystem(systemId), getWorkspace()]);
-  if (!system || system.project_id !== projectId) notFound();
-
-  const [attempts, allPhotos] = await Promise.all([
+  const [system, { memberNames }, attempts, allPhotos] = await Promise.all([
+    getAcSystem(systemId),
+    getWorkspace(),
     listAcPressureTests(systemId),
     listAcPhotos(systemId),
   ]);
-  const stages = await listAcPressureTestStages(attempts.map((a) => a.id));
+  if (!system || system.project_id !== projectId) notFound();
+
   const photos = allPhotos.filter((p) => p.subject === "pressure_start" || p.subject === "pressure_end");
-  const photoUrls = await signAcEvidenceUrls(photos.map((p) => p.storage_path));
+  const [stages, photoUrls] = await Promise.all([
+    listAcPressureTestStages(attempts.map((a) => a.id)),
+    signAcEvidenceUrls(photos.map((p) => p.storage_path)),
+  ]);
 
   return (
     <div>

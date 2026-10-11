@@ -17,16 +17,15 @@ export default async function AcEvacuationChargePage(
   props: PageProps<"/projects/[projectId]/ac/[systemId]/evacuation-charge">,
 ) {
   const { projectId, systemId } = await props.params;
-  const system = await getAcSystem(systemId);
-  if (!system || system.project_id !== projectId) notFound();
-
-  const [evacuation, charge, calcLines, rates, photos] = await Promise.all([
+  const [system, evacuation, charge, calcLines, rates, photos] = await Promise.all([
+    getAcSystem(systemId),
     getAcEvacuation(systemId),
     getAcCharge(systemId),
     listAcChargeCalcLines(systemId),
     listAcChargeRates(),
     listAcPhotos(systemId),
   ]);
+  if (!system || system.project_id !== projectId) notFound();
   if (!evacuation || !charge) notFound();
 
   const hasFinalPhoto = photos.some((p) => p.subject === "evacuation_final");

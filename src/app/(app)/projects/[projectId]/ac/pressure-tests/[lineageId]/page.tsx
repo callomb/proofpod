@@ -16,18 +16,22 @@ export default async function StandaloneAcPressureTestPage(
   props: PageProps<"/projects/[projectId]/ac/pressure-tests/[lineageId]">,
 ) {
   const { projectId, lineageId } = await props.params;
-  const [project, { memberNames }] = await Promise.all([getProject(projectId), getWorkspace()]);
+  const [project, { memberNames }, attempts] = await Promise.all([
+    getProject(projectId),
+    getWorkspace(),
+    listAcPressureTestsByLineage(lineageId),
+  ]);
   if (!project) notFound();
-
-  const attempts = await listAcPressureTestsByLineage(lineageId);
   if (attempts.length === 0 || attempts[0].project_id !== projectId) notFound();
 
-  const [allPhotos, stages] = await Promise.all([
-    listAcPhotosForPressureTests(attempts.map((a) => a.id)),
-    listAcPressureTestStages(attempts.map((a) => a.id)),
-  ]);
+  // The stages query and the photos -> signed links chain run side by side.
+  const stagesPromise = listAcPressureTestStages(attempts.map((a) => a.id));
+  const allPhotos = await listAcPhotosForPressureTests(attempts.map((a) => a.id));
   const photos = allPhotos.filter((p) => p.subject === "pressure_start" || p.subject === "pressure_end");
-  const photoUrls = await signAcEvidenceUrls(photos.map((p) => p.storage_path));
+  const [stages, photoUrls] = await Promise.all([
+    stagesPromise,
+    signAcEvidenceUrls(photos.map((p) => p.storage_path)),
+  ]);
 
   return (
     <div>

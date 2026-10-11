@@ -52,35 +52,28 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
   const supabase = await createClient();
   const user = await requireUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single<Profile>();
-
-  const { data: membership } = await supabase
-    .from("company_members")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<CompanyMember>();
+  const [{ data: profile }, { data: membership }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user.id).single<Profile>(),
+    supabase
+      .from("company_members")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle<CompanyMember>(),
+  ]);
 
   if (!profile || !membership) redirect("/onboarding");
   if (membership.status === "inactive") redirect("/deactivated");
 
-  const { data: company } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("id", membership.company_id)
-    .single<Company>();
+  // These three only need the company id, so they run together.
+  const [{ data: company }, { data: members }, { data: moduleRows }] = await Promise.all([
+    supabase.from("companies").select("*").eq("id", membership.company_id).single<Company>(),
+    supabase.from("company_members").select("user_id").eq("company_id", membership.company_id),
+    supabase.from("company_modules").select("module, enabled").eq("company_id", membership.company_id),
+  ]);
 
   if (!company) redirect("/onboarding");
-
-  const { data: members } = await supabase
-    .from("company_members")
-    .select("user_id")
-    .eq("company_id", company.id);
 
   const userIds = (members ?? []).map((m) => (m as { user_id: string }).user_id);
   const { data: memberProfiles } = await supabase
@@ -95,10 +88,6 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
 
   const isAdmin = membership.role === "admin" || membership.role === "owner";
 
-  const { data: moduleRows } = await supabase
-    .from("company_modules")
-    .select("module, enabled")
-    .eq("company_id", company.id);
   const moduleSet = new Set(
     ((moduleRows ?? []) as { module: ModuleKey; enabled: boolean }[])
       .filter((r) => r.enabled)

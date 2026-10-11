@@ -143,6 +143,11 @@ export default async function ProjectPage(props: PageProps<"/projects/[projectId
     ? (sp.module as ModuleKey)
     : modules[0];
 
+  const [acSystems, acStandaloneTests] =
+    activeModule === "ac_commissioning"
+      ? await Promise.all([listProjectAcSystems(projectId), listStandaloneAcPressureTests(projectId)])
+      : [[], []];
+
   return (
     <div>
       <div className="mb-3">
@@ -178,11 +183,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[projectId
       ) : null}
 
       {activeModule === "ac_commissioning" ? (
-        <AcSection
-          systems={await listProjectAcSystems(projectId)}
-          standaloneTests={await listStandaloneAcPressureTests(projectId)}
-          projectId={projectId}
-        />
+        <AcSection systems={acSystems} standaloneTests={acStandaloneTests} projectId={projectId} />
       ) : (
         <PlumbingSection tests={await listProjectTests(projectId)} projectId={projectId} />
       )}
