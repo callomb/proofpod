@@ -1,13 +1,14 @@
 "use client";
 
+import { shrinkImage } from "./image";
 import { outbox } from "./index";
 import type { EnqueueResult, PhotoRecord } from "./types";
 
 export const OFFLINE_MESSAGE = "No signal — this needs a connection. Try again when you're back online.";
 
 /** Saves a photo on the phone and sends it (now if there's signal, otherwise when it returns). */
-export function queuePhoto(
-  file: File,
+export async function queuePhoto(
+  original: File,
   opts: {
     companyId: string;
     projectId: string;
@@ -16,7 +17,8 @@ export function queuePhoto(
     scope: string;
     record: Omit<PhotoRecord, "mime" | "sizeBytes">;
   },
-): Promise<EnqueueResult & { path: string }> {
+): Promise<EnqueueResult & { path: string; mime: string }> {
+  const file = await shrinkImage(original);
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
   const path = `${opts.companyId}/${opts.projectId}/${opts.folderId}/${crypto.randomUUID()}.${ext}`;
   const contentType = file.type || "image/jpeg";
@@ -32,5 +34,5 @@ export function queuePhoto(
     },
     file,
   )
-    .then((r) => ({ ...r, path }));
+    .then((r) => ({ ...r, path, mime: contentType }));
 }

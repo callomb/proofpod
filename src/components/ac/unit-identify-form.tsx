@@ -93,7 +93,7 @@ export function UnitIdentifyForm({
       }
 
       try {
-        const extracted = await extractDataPlateAction(unit.id, photo.path, file.type);
+        const extracted = await extractDataPlateAction(unit.id, photo.path, photo.mime);
         if (extracted.model || extracted.serial || extracted.manufactureDate) {
           if (extracted.model) setModelNumber(extracted.model);
           if (extracted.serial) setSerialNumber(extracted.serial);
